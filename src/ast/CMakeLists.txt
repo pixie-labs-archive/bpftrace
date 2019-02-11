@@ -11,6 +11,10 @@ target_include_directories(ast PUBLIC ${CMAKE_SOURCE_DIR}/src/ast)
 target_include_directories(ast PUBLIC ${CMAKE_BINARY_DIR})
 target_link_libraries(ast arch)
 
+if(HAVE_BCC_CREATE_MAP)
+  target_compile_definitions(ast PUBLIC BPF_FUNC_get_current_cgroup_id=0)
+endif(HAVE_BCC_CREATE_MAP)
+
 add_dependencies(ast parser)
 
 if (STATIC_LINKING)
