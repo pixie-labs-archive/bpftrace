@@ -641,9 +641,9 @@ void BPFtrace::poll_perf_events(int epollfd, bool drain)
   return;
 }
 
-std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>> BPFtrace::return_maps()
+std::unordered_map<std::string, RetMap> BPFtrace::return_maps()
 {
-  std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>> retmaps;
+  std::unordered_map<std::string, RetMap> retmaps;
 
   for(auto &mapmap : maps_)
   {
@@ -662,9 +662,9 @@ std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>> BPFtr
   return retmaps;
 }
 
-std::unordered_map<std::string, uint64_t> BPFtrace::return_map(IMap &map, uint32_t top, uint32_t div)
+RetMap BPFtrace::return_map(IMap &map, uint32_t top, uint32_t div)
 {
-  std::unordered_map<std::string, uint64_t> retmap;
+  RetMap retmap;
 
   std::vector<uint8_t> old_key;
   try
@@ -744,9 +744,7 @@ std::unordered_map<std::string, uint64_t> BPFtrace::return_map(IMap &map, uint32
 
     //std::cout << map.name_ << map.key_.argument_value_list(*this, key) << ": ";
 
-    std::string valkey = map.key_.argument_value_list(*this, key);
     uint64_t val;
-
 
     if (map.type_.type == Type::kstack) {
       //std::cout << get_stack(*(uint64_t *) value.data(), false, map.type_.stack_size, 8);
@@ -792,8 +790,17 @@ std::unordered_map<std::string, uint64_t> BPFtrace::return_map(IMap &map, uint32
     else {
       val = *(int64_t *) value.data() / div;
     }
-    
-    retmap[valkey] = val;
+
+    //std::string valkey = map.key_.argument_value_list(*this, key);
+    //retmap[valkey] = val;
+
+    if (key.size() == 8) {
+      uint64_t valkey = *(reinterpret_cast<uint64_t *>(key.data()));
+      retmap[valkey] = val;
+    }
+    else {
+      std::cerr << "Unexpected key size" << std::endl;
+    }
   }
 
   return retmap;
