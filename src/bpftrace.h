@@ -4,6 +4,7 @@
 #include <memory>
 #include <set>
 #include <vector>
+#include <unordered_map>
 
 #include "ast.h"
 #include "attached_probe.h"
@@ -54,7 +55,9 @@ public:
   virtual ~BPFtrace();
   virtual int add_probe(ast::Probe &p);
   int num_probes() const;
-  int run(std::unique_ptr<BpfOrc> bpforc);
+  int run(BpfOrc* bpforc);
+  std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>> return_maps();
+  std::unordered_map<std::string, uint64_t> return_map(IMap &map, uint32_t top, uint32_t div);
   int print_maps();
   int print_map_ident(const std::string &ident, uint32_t top, uint32_t div);
   int clear_map_ident(const std::string &ident);
