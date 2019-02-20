@@ -61,7 +61,7 @@ public:
   void compileModule(std::unique_ptr<Module> M)
   {
     auto mod = addModule(move(M));
-    auto e = CompileLayer.emitAndFinalize(mod);
+    (void)(CompileLayer.emitAndFinalize(mod));
   }
 
   ModuleHandle addModule(std::unique_ptr<Module> M) {
@@ -96,7 +96,7 @@ public:
 
   void compileModule(std::unique_ptr<Module> M) {
     auto K = addModule(move(M));
-    auto e = CompileLayer.emitAndFinalize(K);
+    (void)(CompileLayer.emitAndFinalize(K));
   }
 
   VModuleKey addModule(std::unique_ptr<Module> M) {

@@ -559,10 +559,8 @@ int BPFtrace::run(BpfOrc* bpforc)
   if (bt_verbose)
     std::cerr << "Running..." << std::endl;
 
-  if (attached_probes_.size() > 1) {
-    poll_perf_events(epollfd);
-    attached_probes_.clear();
-  }
+  //poll_perf_events(epollfd);
+  //attached_probes_.clear();
 
   END_trigger();
   poll_perf_events(epollfd, true);
