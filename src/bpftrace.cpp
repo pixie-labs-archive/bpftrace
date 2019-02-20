@@ -569,6 +569,11 @@ int BPFtrace::run(BpfOrc* bpforc)
   return 0;
 }
 
+void BPFtrace::stop() {
+  attached_probes_.clear();
+  special_attached_probes_.clear();
+}
+
 int BPFtrace::setup_perf_events()
 {
   int epollfd = epoll_create1(EPOLL_CLOEXEC);
