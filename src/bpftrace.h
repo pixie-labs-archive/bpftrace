@@ -57,7 +57,7 @@ public:
   virtual ~BPFtrace();
   virtual int add_probe(ast::Probe &p);
   int num_probes() const;
-  int run(BpfOrc* bpforc);
+  int run(BpfOrc* bpforc, bool nonblocking = false);
   void stop();
   std::unordered_map<std::string, RetMap> return_maps();
   RetMap return_map(IMap &map, uint32_t top, uint32_t div);

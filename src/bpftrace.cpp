@@ -512,7 +512,7 @@ std::unique_ptr<AttachedProbe> BPFtrace::attach_probe(Probe &probe, const BpfOrc
   return nullptr;
 }
 
-int BPFtrace::run(BpfOrc* bpforc)
+int BPFtrace::run(BpfOrc* bpforc, bool nonblocking)
 {
   auto r_special_probes = special_probes_.rbegin();
   for (; r_special_probes != special_probes_.rend(); ++r_special_probes)
@@ -560,7 +560,7 @@ int BPFtrace::run(BpfOrc* bpforc)
   if (bt_verbose)
     std::cerr << "Running..." << std::endl;
 
-  if (!bt_nonblocking) {
+  if (!nonblocking) {
     if (attached_probes_.size() > 1) {
       poll_perf_events(epollfd);
       attached_probes_.clear();
