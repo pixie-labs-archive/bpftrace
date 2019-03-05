@@ -804,11 +804,11 @@ RetMap BPFtrace::return_map(IMap &map, uint32_t top, uint32_t div)
     //retmap[valkey] = val;
 
     if (key.size() == 8) {
-      uint64_t valkey = *((key.data()));
+      uint64_t valkey = *(reinterpret_cast<uint64_t*>(key.data()));
       retmap[valkey] = val;
     }
     else if (key.size() == 4) {
-      uint32_t valkey = *(key.data());
+      uint32_t valkey = *(reinterpret_cast<uint32_t*>(key.data()));
       retmap[valkey] = val;
     }
     else {
