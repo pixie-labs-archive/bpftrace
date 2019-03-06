@@ -49,6 +49,7 @@ inline DebugLevel operator++(DebugLevel& level, int)
 }
 
 using RetMap = std::unordered_map<uint64_t, uint64_t>;
+using BPFTraceMap = std::vector<std::pair<std::vector<uint8_t>, std::vector<uint8_t>>>;
 
 class BPFtrace
 {
@@ -61,6 +62,7 @@ public:
   void stop();
   std::unordered_map<std::string, RetMap> return_maps();
   RetMap return_map(IMap &map, uint32_t top, uint32_t div);
+  BPFTraceMap get_map(const std::string& name);
   int print_maps();
   int print_map_ident(const std::string &ident, uint32_t top, uint32_t div);
   int clear_map_ident(const std::string &ident);

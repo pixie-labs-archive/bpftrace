@@ -31,7 +31,6 @@ namespace bpftrace {
 
 DebugLevel bt_debug = DebugLevel::kNone;
 bool bt_verbose = false;
-bool bt_nonblocking = false;
 
 BPFtrace::~BPFtrace()
 {
@@ -648,6 +647,46 @@ void BPFtrace::poll_perf_events(int epollfd, bool drain)
     }
   }
   return;
+}
+
+BPFTraceMap BPFtrace::get_map(const std::string& name) {
+
+  auto& mapmap = maps_[name];
+  IMap& map = *mapmap.get();
+
+  BPFTraceMap values_by_key;
+
+  std::vector<uint8_t> old_key;
+  try {
+    old_key = find_empty_key(map, map.key_.size());
+  }
+  catch (std::runtime_error &e) {
+    std::cerr << "Error getting key for map '" << map.name_ << "': "
+              << e.what() << std::endl;
+    return values_by_key;
+  }
+  auto key(old_key);
+
+
+
+  while (bpf_get_next_key(map.mapfd_, old_key.data(), key.data()) == 0) {
+    int value_size = map.type_.size;
+    if (map.type_.type == Type::count || map.type_.type == Type::sum ||
+        map.type_.type == Type::min || map.type_.type == Type::max)
+      value_size *= ncpus_;
+    auto value = std::vector<uint8_t>(value_size);
+    int err = bpf_lookup_elem(map.mapfd_, key.data(), value.data());
+    if (err) {
+      std::cerr << "Error looking up elem: " << err << std::endl;
+      continue;
+    }
+
+    values_by_key.push_back({key, value});
+
+    old_key = key;
+  }
+
+  return values_by_key;
 }
 
 std::unordered_map<std::string, RetMap> BPFtrace::return_maps()
