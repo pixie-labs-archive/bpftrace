@@ -48,7 +48,6 @@ inline DebugLevel operator++(DebugLevel& level, int)
   return level;
 }
 
-using RetMap = std::unordered_map<uint64_t, uint64_t>;
 using BPFTraceMap = std::vector<std::pair<std::vector<uint8_t>, std::vector<uint8_t>>>;
 
 class BPFtrace
@@ -60,8 +59,6 @@ public:
   int num_probes() const;
   int run(BpfOrc* bpforc, bool nonblocking = false);
   void stop();
-  std::unordered_map<std::string, RetMap> return_maps();
-  RetMap return_map(IMap &map, uint32_t top, uint32_t div);
   BPFTraceMap get_map(const std::string& name);
   int print_maps();
   int print_map_ident(const std::string &ident, uint32_t top, uint32_t div);
@@ -120,6 +117,7 @@ private:
   std::unique_ptr<AttachedProbe> attach_probe(Probe &probe, const BpfOrc &bpforc);
   int setup_perf_events();
   void poll_perf_events(int epollfd, bool drain=false);
+  BPFTraceMap get_map(IMap &map);
   int clear_map(IMap &map);
   int zero_map(IMap &map);
   int print_map(IMap &map, uint32_t top, uint32_t div);

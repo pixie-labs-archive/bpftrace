@@ -650,10 +650,13 @@ void BPFtrace::poll_perf_events(int epollfd, bool drain)
 }
 
 BPFTraceMap BPFtrace::get_map(const std::string& name) {
-
   auto& mapmap = maps_[name];
   IMap& map = *mapmap.get();
+  return get_map(map);
+}
 
+
+BPFTraceMap BPFtrace::get_map(IMap &map) {
   BPFTraceMap values_by_key;
 
   std::vector<uint8_t> old_key;
@@ -679,68 +682,6 @@ BPFTraceMap BPFtrace::get_map(const std::string& name) {
     if (err) {
       std::cerr << "Error looking up elem: " << err << std::endl;
       continue;
-    }
-
-    values_by_key.push_back({key, value});
-
-    old_key = key;
-  }
-
-  return values_by_key;
-}
-
-std::unordered_map<std::string, RetMap> BPFtrace::return_maps()
-{
-  std::unordered_map<std::string, RetMap> retmaps;
-
-  for(auto &mapmap : maps_)
-  {
-    IMap &map = *mapmap.second.get();
-    int err;
-    if (map.type_.type == Type::hist || map.type_.type == Type::lhist)
-      //err = print_map_hist(map, 0, 0);
-      std::cerr << "Map type unsupported" << std::endl;
-    else if (map.type_.type == Type::avg || map.type_.type == Type::stats)
-      //err = print_map_stats(map);
-      std::cerr << "Map type unsupported" << std::endl;
-    else
-      retmaps[map.name_] = return_map(map, 0, 0);
-  }
-
-  return retmaps;
-}
-
-RetMap BPFtrace::return_map(IMap &map, uint32_t top, uint32_t div)
-{
-  RetMap retmap;
-
-  std::vector<uint8_t> old_key;
-  try
-  {
-    old_key = find_empty_key(map, map.key_.size());
-  }
-  catch (std::runtime_error &e)
-  {
-    std::cerr << "Error getting key for map '" << map.name_ << "': "
-              << e.what() << std::endl;
-    return retmap;
-  }
-  auto key(old_key);
-
-  std::vector<std::pair<std::vector<uint8_t>, std::vector<uint8_t>>> values_by_key;
-
-  while (bpf_get_next_key(map.mapfd_, old_key.data(), key.data()) == 0)
-  {
-    int value_size = map.type_.size;
-    if (map.type_.type == Type::count || map.type_.type == Type::sum ||
-        map.type_.type == Type::min || map.type_.type == Type::max)
-      value_size *= ncpus_;
-    auto value = std::vector<uint8_t>(value_size);
-    int err = bpf_lookup_elem(map.mapfd_, key.data(), value.data());
-    if (err)
-    {
-      std::cerr << "Error looking up elem: " << err << std::endl;
-      return retmap;
     }
 
     values_by_key.push_back({key, value});
@@ -774,88 +715,7 @@ RetMap BPFtrace::return_map(IMap &map, uint32_t top, uint32_t div)
     sort_by_key(map.key_.args_, values_by_key);
   };
 
-
-  if (div == 0)
-    div = 1;
-  uint32_t i = 0;
-  size_t total = values_by_key.size();
-  for (auto &pair : values_by_key)
-  {
-    auto key = pair.first;
-    auto value = pair.second;
-
-    if (top)
-    {
-      if (total > top && i++ < (total - top))
-        continue;
-    }
-
-    //std::cout << map.name_ << map.key_.argument_value_list(*this, key) << ": ";
-
-    uint64_t val;
-
-    if (map.type_.type == Type::kstack) {
-      //std::cout << get_stack(*(uint64_t *) value.data(), false, map.type_.stack_size, 8);
-      std::cerr << "Unsupported map type: kstack" << std::endl;
-    }
-    else if (map.type_.type == Type::ustack) {
-      //std::cout << get_stack(*(uint64_t *) value.data(), true, map.type_.stack_size, 8);
-      std::cerr << "Unsupported map type: ustack" << std::endl;
-    }
-    else if (map.type_.type == Type::ksym) {
-      //std::cout << resolve_ksym(*(uintptr_t *) value.data());
-      std::cerr << "Unsupported map type: ksym" << std::endl;
-    }
-    else if (map.type_.type == Type::usym) {
-      //std::cout << resolve_usym(*(uintptr_t *) value.data(), *(uint64_t *) (value.data() + 8));
-      std::cerr << "Unsupported map type: usym" << std::endl;
-    }
-    else if (map.type_.type == Type::inet) {
-      //std::cout << resolve_inet(*(uintptr_t *) value.data(), *(uint64_t *) (value.data() + 8));
-      std::cerr << "Unsupported map type: inet" << std::endl;
-    }
-    else if (map.type_.type == Type::username) {
-      //std::cout << resolve_uid(*(uint64_t *) (value.data())) << std::endl;
-      std::cerr << "Unsupported map type: username" << std::endl;
-    }
-    else if (map.type_.type == Type::string) {
-      std::cout << value.data() << std::endl;
-      std::cerr << "Unsupported map type: string" << std::endl;
-    }
-    else if (map.type_.type == Type::count || map.type_.type == Type::sum) {
-      val = reduce_value(value, ncpus_);
-    }
-    else if (map.type_.type == Type::min) {
-      val = min_value(value, ncpus_) / div;
-    }
-    else if (map.type_.type == Type::max) {
-      val = max_value(value, ncpus_) / div;
-    }
-    else if (map.type_.type == Type::probe) {
-      //std::cout << resolve_probe(*(uint64_t *) value.data()) << std::endl;
-      std::cerr << "Unsupported map type: probe" << std::endl;
-    }
-    else {
-      val = *(int64_t *) value.data() / div;
-    }
-
-    //std::string valkey = map.key_.argument_value_list(*this, key);
-    //retmap[valkey] = val;
-
-    if (key.size() == 8) {
-      uint64_t valkey = *(reinterpret_cast<uint64_t*>(key.data()));
-      retmap[valkey] = val;
-    }
-    else if (key.size() == 4) {
-      uint32_t valkey = *(reinterpret_cast<uint32_t*>(key.data()));
-      retmap[valkey] = val;
-    }
-    else {
-      std::cerr << "Unexpected key size: " << key.size() << std::endl;
-    }
-  }
-
-  return retmap;
+  return values_by_key;
 }
 
 int BPFtrace::print_maps()
