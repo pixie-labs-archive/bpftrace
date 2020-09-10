@@ -1,9 +1,12 @@
+#include <cstring>
 #include <iostream>
 #include <unistd.h>
 #include <linux/version.h>
 
-#include "libbpf.h"
+#include "bpftrace.h"
+#include "log.h"
 #include "utils.h"
+#include <bcc/libbpf.h>
 
 #include "map.h"
 
@@ -17,7 +20,7 @@ int Map::create_map(enum bpf_map_type map_type, const char *name, int key_size, 
 #endif
 }
 
-Map::Map(const std::string &name, const SizedType &type, const MapKey &key, int min, int max, int step)
+Map::Map(const std::string &name, const SizedType &type, const MapKey &key, int min, int max, int step, int max_entries)
 {
   name_ = name;
   type_ = type;
@@ -28,36 +31,40 @@ Map::Map(const std::string &name, const SizedType &type, const MapKey &key, int 
   lqstep = step;
 
   int key_size = key.size();
-  if (type.type == Type::hist || type.type == Type::lhist ||
-      type.type == Type::avg || type.type == Type::stats)
+  if (type.IsHistTy() || type.IsLhistTy() || type.IsAvgTy() || type.IsStatsTy())
     key_size += 8;
   if (key_size == 0)
     key_size = 8;
 
-  int max_entries = 128;
-  enum bpf_map_type map_type;
-  if ((type.type == Type::hist || type.type == Type::lhist || type.type == Type::count ||
-      type.type == Type::sum || type.type == Type::min || type.type == Type::max ||
-      type.type == Type::avg || type.type == Type::stats) &&
-      (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)))
+  if (type.IsCountTy() && !key.args_.size())
   {
-      map_type = BPF_MAP_TYPE_PERCPU_HASH;
+    map_type_ = BPF_MAP_TYPE_PERCPU_ARRAY;
+    max_entries = 1;
+    key_size = 4;
   }
-  else if (type.type == Type::join)
+  else if ((type.IsHistTy() || type.IsLhistTy() || type.IsCountTy() ||
+            type.IsSumTy() || type.IsMinTy() || type.IsMaxTy() ||
+            type.IsAvgTy() || type.IsStatsTy()) &&
+           (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)))
   {
-    map_type = BPF_MAP_TYPE_PERCPU_ARRAY;
+      map_type_ = BPF_MAP_TYPE_PERCPU_HASH;
+  }
+  else if (type.IsJoinTy())
+  {
+    map_type_ = BPF_MAP_TYPE_PERCPU_ARRAY;
     max_entries = 1;
     key_size = 4;
   }
   else
-    map_type = BPF_MAP_TYPE_HASH;
+    map_type_ = BPF_MAP_TYPE_HASH;
 
   int value_size = type.size;
   int flags = 0;
-  mapfd_ = create_map(map_type, name.c_str(), key_size, value_size, max_entries, flags);
+  mapfd_ = create_map(map_type_, name.c_str(), key_size, value_size, max_entries, flags);
   if (mapfd_ < 0)
   {
-    std::cerr << "Error creating map: '" << name_ << "'" << std::endl;
+    LOG(ERROR) << "failed to create map: '" << name_
+               << "': " << strerror(errno);
   }
 }
 
@@ -65,13 +72,13 @@ Map::Map(const SizedType &type) {
 #ifdef DEBUG
   // TODO (mmarchini): replace with DCHECK
   if (!type.IsStack()) {
-    std::cerr << "Map::Map(SizedType) constructor should be called only with stack types" << std::endl;
-    abort()
+    LOG(FATAL) << "Map::Map(SizedType) constructor should be called only with "
+                  "stack types";
   }
 #endif
   type_ = type;
   int key_size = 4;
-  int value_size = sizeof(uintptr_t) * type.stack_size;
+  int value_size = sizeof(uintptr_t) * type.stack_type.limit;
   std::string name = "stack";
   int max_entries = 4096;
   int flags = 0;
@@ -80,26 +87,27 @@ Map::Map(const SizedType &type) {
   mapfd_ = create_map(map_type, name.c_str(), key_size, value_size, max_entries, flags);
   if (mapfd_ < 0)
   {
-    std::cerr << "Error creating stack id map" << std::endl;
-    // TODO (mmarchini): Check perf_event_max_stack in the semantic_analyzer
-    std::cerr << "This might have happened because kernel.perf_event_max_stack"
-      << "is smaller than " << type.stack_size
-      << ". Try to tweak this value with"
-      << "sysctl kernel.perf_event_max_stack=<new value>" << std::endl;
+    LOG(ERROR)
+        << "failed to create stack id map\n"
+        // TODO (mmarchini): Check perf_event_max_stack in the semantic_analyzer
+        << "This might have happened because kernel.perf_event_max_stack "
+        << "is smaller than " << type.stack_type.limit
+        << ". Try to tweak this value with "
+        << "sysctl kernel.perf_event_max_stack=<new value>";
   }
 }
 
 Map::Map(enum bpf_map_type map_type)
 {
   int key_size, value_size, max_entries, flags;
+  map_type_ = map_type;
 
   std::string name;
 #ifdef DEBUG
   // TODO (mmarchini): replace with DCHECK
   if (map_type == BPF_MAP_TYPE_STACK_TRACE)
   {
-    std::cerr << "Use Map::Map(SizedType) constructor instead" << std::endl;
-    abort();
+    LOG(FATAL) << "Use Map::Map(SizedType) constructor instead";
   }
 #endif
   if (map_type == BPF_MAP_TYPE_PERF_EVENT_ARRAY)
@@ -113,25 +121,13 @@ Map::Map(enum bpf_map_type map_type)
   }
   else
   {
-    std::cerr << "invalid map type" << std::endl;
-    abort();
+    LOG(FATAL) << "invalid map type";
   }
 
   mapfd_ = create_map(map_type, name.c_str(), key_size, value_size, max_entries, flags);
   if (mapfd_ < 0)
   {
-    std::string name;
-    switch (map_type)
-    {
-      case BPF_MAP_TYPE_PERF_EVENT_ARRAY:
-        name = "perf event";
-        break;
-      default:
-        std::cerr << "invalid map type" << std::endl;
-        abort();
-    }
-
-    std::cerr << "Error creating " << name << " map (" << mapfd_ << ")" << std::endl;
+    LOG(ERROR) << "failed to create " << name << " map: " << strerror(errno);
   }
 }
 

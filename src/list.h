@@ -1,8 +1,16 @@
+#pragma once
+
 #include <sstream>
 
 #include <linux/perf_event.h>
 
+#include "bpftrace.h"
+
 namespace bpftrace {
+
+const std::string kprobe_path =
+    "/sys/kernel/debug/tracing/available_filter_functions";
+const std::string tp_path = "/sys/kernel/debug/tracing/events";
 
 struct ProbeListItem
 {
@@ -29,6 +37,7 @@ const std::vector<ProbeListItem> SW_PROBE_LIST = {
 const std::vector<ProbeListItem> HW_PROBE_LIST = {
   { "backend-stalls",      "",         PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000000 },
   { "branch-instructions", "branches", PERF_COUNT_HW_BRANCH_INSTRUCTIONS,      100000 },
+  { "branch-misses",       "",         PERF_COUNT_HW_BRANCH_MISSES,            100000 },
   { "bus-cycles",          "",         PERF_COUNT_HW_BUS_CYCLES,               100000 },
   { "cache-misses",        "",         PERF_COUNT_HW_CACHE_MISSES,            1000000 },
   { "cache-references",    "",         PERF_COUNT_HW_CACHE_REFERENCES,        1000000 },
@@ -38,7 +47,6 @@ const std::vector<ProbeListItem> HW_PROBE_LIST = {
   { "ref-cycles",          "",         PERF_COUNT_HW_REF_CPU_CYCLES,          1000000 }
 };
 
-void list_probes(const std::string &search);
-void list_probes();
+void list_probes(const BPFtrace &bpftrace, const std::string &search = "");
 
 } // namespace bpftrace

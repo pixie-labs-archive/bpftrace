@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <fstream>
 #include <iomanip>
@@ -8,28 +9,13 @@
 #include <vector>
 #include <string>
 
-#include "list.h"
 #include "bpftrace.h"
+#include "btf.h"
+#include "list.h"
+#include "log.h"
+#include "utils.h"
 
 namespace bpftrace {
-
-const std::string kprobe_path = "/sys/kernel/debug/tracing/available_filter_functions";
-const std::string tp_path = "/sys/kernel/debug/tracing/events";
-
-std::string replace_all(const std::string &str, const std::string &from,
-			const std::string &to)
-{
-    std::string result(str);
-    std::string::size_type
-        index = 0,
-        from_len = from.size(),
-        to_len = to.size();
-    while ((index = result.find(from, index)) != std::string::npos) {
-        result.replace(index, from_len, to);
-        index += to_len;
-    }
-    return result;
-}
 
 inline bool search_probe(const std::string &probe, const std::regex& re)
 {
@@ -81,13 +67,13 @@ void print_tracepoint_args(const std::string &category, const std::string &event
 {
   std::string format_file_path = tp_path + "/" + category + "/" + event + "/format";
   std::ifstream format_file(format_file_path.c_str());
-  std::regex re("^	field:.*;$", std::regex::icase | std::regex::grep | std::regex::nosubs |
-                                     std::regex::optimize);
+  std::regex re("^\tfield:.*;$", std::regex::icase | std::regex::grep |
+                                 std::regex::nosubs | std::regex::optimize);
   std::string line;
 
   if (format_file.fail())
   {
-    std::cerr << "ERROR: tracepoint format file not found: " << format_file_path << std::endl;
+    LOG(ERROR) << "tracepoint format file not found: " << format_file_path;
     return;
   }
 
@@ -113,53 +99,119 @@ void print_tracepoint_args(const std::string &category, const std::string &event
   }
 }
 
-void list_probes(const std::string &search_input)
+static void list_uprobes(const BPFtrace& bpftrace,
+                         const std::string& probe_name,
+                         const std::string& search,
+                         const std::regex& re)
 {
-  std::string search = search_input;
+    std::unique_ptr<std::istream> symbol_stream;
+    // Given path (containing a possible wildcard)
+    std::string path;
+    bool show_all = false;
 
-  std::smatch probe_match;
-  std::regex probe_regex(":.*");
-  std::regex_search ( search, probe_match, probe_regex );
+    if (bpftrace.pid() > 0)
+    {
+      path = get_pid_exe(bpftrace.pid());
+      path = path_for_pid_mountns(bpftrace.pid(), path);
+    }
+    else if (probe_name == "uprobe" || probe_name == "uretprobe")
+    {
+      path = search;
+      erase_prefix(path); // remove "u[ret]probe:" prefix
+      show_all = path.find(':') == std::string::npos;
+      path = erase_prefix(path); // extract "path" prefix from "path:fun"
 
-  // replace alias name with full name
-  if (probe_match.size())
+      auto abs_paths = resolve_binary_path(path);
+      if (abs_paths.empty())
+      {
+        LOG(ERROR) << probe_name << " target '" << path
+                   << "' does not exist or is not executable";
+        return;
+      }
+    }
+
+    if (!path.empty())
+    {
+      symbol_stream = std::make_unique<std::istringstream>(
+          bpftrace.extract_func_symbols_from_path(path));
+
+      std::string line;
+      while (std::getline(*symbol_stream, line))
+      {
+        std::string probe = (probe_name.empty() ? "uprobe" : probe_name) + ":" +
+                            line;
+        if (show_all || search.empty() || !search_probe(probe, re))
+          std::cout << probe << std::endl;
+      }
+    }
+}
+
+static void list_usdt(const BPFtrace& bpftrace,
+                      const std::string& probe_name,
+                      const std::string& search,
+                      const std::regex& re)
+{
+  usdt_probe_list usdt_probes;
+  bool show_all = false;
+  if (bpftrace.pid() > 0)
   {
-    auto pos = probe_match.position(0);
-    auto probe_name =  probetypeName(search.substr(0, probe_match.position(0)));
-    search = probe_name + search.substr(pos, search.length());
+    // PID takes precedence over path, so path from search expression will be
+    // ignored if pid specified
+    usdt_probes = USDTHelper::probes_for_pid(bpftrace.pid());
+  }
+  else if (probe_name == "usdt")
+  {
+    std::string usdt_path = search;
+    erase_prefix(usdt_path); // remove the "usdt:" prefix;
+    show_all = usdt_path.find(':') == std::string::npos;
+    usdt_path = erase_prefix(usdt_path); // extract "path" from "path:ns:fun"
+    auto paths = resolve_binary_path(usdt_path, bpftrace.pid());
+    if (!paths.empty())
+    {
+      for (auto& path : paths)
+      {
+        auto path_usdt_probes = USDTHelper::probes_for_path(path);
+        usdt_probes.insert(usdt_probes.end(),
+                           path_usdt_probes.begin(),
+                           path_usdt_probes.end());
+      }
+    }
+    else
+    {
+      LOG(ERROR) << "usdt target '" << usdt_path
+                 << "' does not exist or is not executable";
+      return;
+    }
   }
 
-  unsigned int i, j;
-  std::string line, probe;
-  std::string glob = "*";
-  std::string regex = ".*";
-  std::string s = replace_all(search,glob,regex);
-  glob = "?";
-  regex = ".";
-  s = replace_all(s,glob,regex);
-  s = "^" + s + "$";
-  std::regex re(s, std::regex::icase | std::regex::grep | std::regex::nosubs | std::regex::optimize);
-
-  // software
-  list_probes_from_list(SW_PROBE_LIST, "software", search, re);
-
-  // hardware
-  list_probes_from_list(HW_PROBE_LIST, "hardware", search, re);
-
-  // tracepoints
-  std::vector<std::string> cats = std::vector<std::string>();
-  list_dir(tp_path, cats);
-  for (i = 0; i < cats.size(); i++)
+  for (auto const& usdt_probe : usdt_probes)
   {
-    if (cats[i] == "." || cats[i] == ".." || cats[i] == "enable" || cats[i] == "filter")
+    std::string path = usdt_probe.path;
+    std::string provider = usdt_probe.provider;
+    std::string fname = usdt_probe.name;
+    std::string probe = "usdt:" + path + ":" + provider + ":" + fname;
+    if (show_all || search.empty() || !search_probe(probe, re))
+      std::cout << probe << std::endl;
+  }
+}
+
+static void list_tracepoints(const std::string& search, const std::regex& re)
+{
+  std::string probe;
+  std::vector<std::string> cats;
+  list_dir(tp_path, cats);
+  for (const std::string& cat : cats)
+  {
+    if (cat == "." || cat == ".." || cat == "enable" || cat == "filter")
       continue;
     std::vector<std::string> events = std::vector<std::string>();
-    list_dir(tp_path + "/" + cats[i], events);
-    for (j = 0; j < events.size(); j++)
+    list_dir(tp_path + "/" + cat, events);
+    for (const std::string& event : events)
     {
-      if (events[j] == "." || events[j] == ".." || events[j] == "enable" || events[j] == "filter")
+      if (event == "." || event == ".." || event == "enable" ||
+          event == "filter")
         continue;
-      probe = "tracepoint:" + cats[i] + ":" + events[j];
+      probe = "tracepoint:" + cat + ":" + event;
 
       if (!search.empty())
       {
@@ -169,31 +221,32 @@ void list_probes(const std::string &search_input)
 
       std::cout << probe << std::endl;
       if (bt_verbose)
-        print_tracepoint_args(cats[i], events[j]);
+        print_tracepoint_args(cat, event);
     }
   }
+}
 
-  // Optimization: If the search expression starts with "t" (tracepoint) there is
-  // no need to search for kprobes.
-  if (search.rfind("t", 0) == 0)
-      return;
-
-  // kprobes
+static void list_kprobes(const std::string& search,
+                         const std::regex& re,
+                         const bool retprobe = false)
+{
   std::ifstream file(kprobe_path);
   if (file.fail())
   {
-    std::cerr << strerror(errno) << ": " << kprobe_path << std::endl;
+    LOG(ERROR) << strerror(errno) << ": " << kprobe_path;
     return;
   }
 
+  std::string probe, line;
   size_t loc;
   while (std::getline(file, line))
   {
     loc = line.find_first_of(" ");
+    probe = retprobe ? "kretprobe:" : "kprobe:";
     if (loc == std::string::npos)
-      probe = "kprobe:" + line;
+      probe += line;
     else
-      probe = "kprobe:" + line.substr(0, loc);
+      probe += line.substr(0, loc);
 
     if (!search.empty())
     {
@@ -203,13 +256,88 @@ void list_probes(const std::string &search_input)
 
     std::cout << probe << std::endl;
   }
-
 }
 
-void list_probes()
+void list_probes(const BPFtrace& bpftrace, const std::string& search_input)
 {
-  const std::string search = "";
-  list_probes(search);
+  std::string search = search_input;
+  std::string probe_name;
+  bool has_wildcard_in_probe = false;
+  std::regex re;
+
+  std::smatch probe_match;
+  std::regex probe_regex(":.*");
+  std::regex_search(search, probe_match, probe_regex);
+
+  // replace alias name with full name
+  if (probe_match.size())
+  {
+    auto pos = probe_match.position(0);
+    probe_name = probetypeName(search.substr(0, probe_match.position(0)));
+    search = probe_name + search.substr(pos, search.length());
+    for (char c : probe_name)
+      has_wildcard_in_probe = has_wildcard_in_probe || c == '*' || c == '?';
+  }
+
+  std::string s = "^";
+  for (char c : search)
+  {
+    if (c == '*')
+      s += ".*";
+    else if (c == '?')
+      s += '.';
+    else
+      s += c;
+  }
+  s += '$';
+  try
+  {
+    re = std::regex(s,
+                    std::regex::icase | std::regex::grep | std::regex::nosubs |
+                        std::regex::optimize);
+  }
+  catch (std::regex_error& e)
+  {
+    LOG(ERROR) << "invalid character in search expression.";
+    return;
+  }
+
+  bool list_all = (bpftrace.pid() == 0) &&
+                  (has_wildcard_in_probe || probe_name.empty());
+
+  // software
+  if (list_all || probe_name == "software")
+    list_probes_from_list(SW_PROBE_LIST, "software", search, re);
+
+  // hardware
+  if (list_all || probe_name == "hardware")
+    list_probes_from_list(HW_PROBE_LIST, "hardware", search, re);
+
+  // uprobe
+  if (bpftrace.pid() > 0 || probe_name == "uprobe" || probe_name == "uretprobe")
+    list_uprobes(bpftrace, probe_name, search, re);
+
+  // usdt
+  if (bpftrace.pid() > 0 || probe_name == "usdt")
+    list_usdt(bpftrace, probe_name, search, re);
+
+  // tracepoints
+  if (list_all || probe_name == "tracepoint")
+    list_tracepoints(search, re);
+
+  // kprobes
+  if (list_all || probe_name == "kprobe" || probe_name == "kretprobe")
+    list_kprobes(search, re, probe_name == "kretprobe");
+
+  // kfuncs
+  if (list_all || probe_name == "kfunc" || probe_name == "kretfunc")
+    bpftrace.btf_.display_kfunc(search.empty() ? nullptr : &re,
+                                probe_name == "kretfunc");
+
+  // struct / union / enum
+  if (probe_name.empty() &&
+      std::regex_search(search, std::regex("^(struct|union|enum) ")))
+    bpftrace.btf_.display_structs(search.empty() ? nullptr : &re);
 }
 
 } // namespace bpftrace

@@ -9,9 +9,10 @@ namespace bpftrace {
 std::string verify_format_string(const std::string &fmt, std::vector<Field> args)
 {
   std::stringstream message;
-  const std::regex re("%-?[0-9]*[a-zA-Z]+");
 
-  auto tokens_begin = std::sregex_iterator(fmt.begin(), fmt.end(), re);
+  auto tokens_begin = std::sregex_iterator(fmt.begin(),
+                                           fmt.end(),
+                                           format_specifier_re);
   auto tokens_end = std::sregex_iterator();
 
   auto num_tokens = std::distance(tokens_begin, tokens_end);
@@ -33,16 +34,20 @@ std::string verify_format_string(const std::string &fmt, std::vector<Field> args
   for (int i=0; i<num_args; i++, token_iter++)
   {
     Type arg_type = args.at(i).type.type;
-    if (arg_type == Type::ksym || arg_type == Type::usym || arg_type == Type::probe ||
-        arg_type == Type::username || arg_type == Type::kstack || arg_type == Type::ustack ||
-        arg_type == Type::inet)
+    if (arg_type == Type::ksym || arg_type == Type::usym ||
+        arg_type == Type::probe || arg_type == Type::username ||
+        arg_type == Type::kstack || arg_type == Type::ustack ||
+        arg_type == Type::inet || arg_type == Type::timestamp)
       arg_type = Type::string; // Symbols should be printed as strings
+    if (arg_type == Type::pointer)
+      arg_type = Type::integer; // Casts (pointers) can be printed as integers
     int offset = 1;
 
     // skip over format widths during verification
     if (token_iter->str()[offset] == '-')
       offset++;
-    while (token_iter->str()[offset] >= '0' && token_iter->str()[offset] <= '9')
+    while ((token_iter->str()[offset] >= '0' && token_iter->str()[offset] <= '9') ||
+           token_iter->str()[offset] == '.')
       offset++;
 
     const std::string token = token_iter->str().substr(offset);
