@@ -2,7 +2,7 @@ if(HAVE_BFD_DISASM)
   set(BFD_DISASM_SRC bfd-disasm.cpp)
 endif()
 
-add_executable(bpftrace
+add_library(bpftrace STATIC
   attached_probe.cpp
   bpffeature.cpp
   bpftrace.cpp
@@ -15,7 +15,6 @@ add_executable(bpftrace
   list.cpp
   lockdown.cpp
   log.cpp
-  main.cpp
   map.cpp
   mapkey.cpp
   output.cpp
@@ -28,7 +27,6 @@ add_executable(bpftrace
   types.cpp
   usdt.cpp
   utils.cpp
-  ${BFD_DISASM_SRC}
 )
 
 if(HAVE_NAME_TO_HANDLE_AT)

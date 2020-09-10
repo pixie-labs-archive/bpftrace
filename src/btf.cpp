@@ -15,7 +15,7 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
-#ifdef HAVE_LIBBPF_BTF_DUMP
+#ifdef HAVE_LIBBPF_BTF_DUMP_DISABLED
 #include <linux/bpf.h>
 #include <linux/btf.h>
 #pragma GCC diagnostic push
