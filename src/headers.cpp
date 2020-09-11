@@ -46,6 +46,37 @@ typedef struct {
 #endif
 )CONTENTS";
 const unsigned __stddef_max_align_t_h_len = sizeof(__stddef_max_align_t_h);
+const char clang_workarounds_h[] = R"CONTENTS(#ifndef __CLANG_WORKAROUNDS_H
+#define __CLANG_WORKAROUNDS_H
+
+// linux/types.h is included by default, which will bring
+// in asm_volatile_goto definition if permitted based on
+// compiler setup and kernel configs.
+//
+// clang does not support "asm volatile goto" yet.
+// So redefine asm_volatile_goto to some invalid asm code.
+// We won't execute this code anyway, so we just need to make sure clang is
+// able to parse our headers.
+//
+// From: https://github.com/iovisor/bcc/pull/2133/files
+#include <linux/types.h>
+#ifdef asm_volatile_goto
+#undef asm_volatile_goto
+#define asm_volatile_goto(x...) asm volatile("invalid use of asm_volatile_goto")
+#endif
+
+// In Linux 5.4 asm_inline was introduced, but it's not supported by clang.
+// Redefine it to just asm to enable successful compilation.
+//
+// From: https://github.com/iovisor/bcc/pull/2547
+#ifdef asm_inline
+#undef asm_inline
+#define asm_inline asm
+#endif
+
+#endif
+)CONTENTS";
+const unsigned clang_workarounds_h_len = sizeof(clang_workarounds_h);
 const char float_h[] = R"CONTENTS(/*===---- float.h - Characteristics of floating point types ----------------===
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -610,7 +641,7 @@ const char stdint_h[] = R"CONTENTS(/*===---- stdint.h - Standard header for size
  *
  * To accommodate targets that are missing types that are exactly 8, 16, 32, or
  * 64 bits wide, this implementation takes an approach of cascading
- * redefintions, redefining __int_leastN_t to successively smaller exact-width
+ * redefinitions, redefining __int_leastN_t to successively smaller exact-width
  * types. It is therefore important that the types are defined in order of
  * descending widths.
  *
@@ -983,7 +1014,7 @@ typedef __UINTMAX_TYPE__ uintmax_t;
  * As in the type definitions, this section takes an approach of
  * successive-shrinking to determine which limits to use for the standard (8,
  * 16, 32, 64) bit widths when they don't have exact representations. It is
- * therefore important that the defintions be kept in order of decending
+ * therefore important that the definitions be kept in order of decending
  * widths.
  *
  * Note that C++ should not check __STDC_LIMIT_MACROS here, contrary to the
