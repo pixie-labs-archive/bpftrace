@@ -1321,7 +1321,7 @@ void CodegenLLVM::visit(Ternary &ternary)
                         ? nullptr
                         : b_.CreateAllocaBPF(ternary.type, "buf");
   Value *cond;
-  auto scoped_del = accept(ternary.cond);
+  auto scoped_del = accept(ternary.cond.get());
   cond = expr_;
   Value *zero_value = Constant::getNullValue(cond->getType());
   b_.CreateCondBr(b_.CreateICmpNE(cond, zero_value, "true_cond"),
@@ -1332,7 +1332,7 @@ void CodegenLLVM::visit(Ternary &ternary)
   {
     // fetch selected integer via CreateStore
     b_.SetInsertPoint(left_block);
-    auto scoped_del_left = accept(ternary.left);
+    auto scoped_del_left = accept(ternary.left.get());
     expr_ = b_.CreateIntCast(expr_,
                              b_.GetType(ternary.type),
                              ternary.type.IsSigned());
@@ -1340,7 +1340,7 @@ void CodegenLLVM::visit(Ternary &ternary)
     b_.CreateBr(done);
 
     b_.SetInsertPoint(right_block);
-    auto scoped_del_right = accept(ternary.right);
+    auto scoped_del_right = accept(ternary.right.get());
     expr_ = b_.CreateIntCast(expr_,
                              b_.GetType(ternary.type),
                              ternary.type.IsSigned());
@@ -1354,12 +1354,12 @@ void CodegenLLVM::visit(Ternary &ternary)
   {
     // copy selected string via CreateMemCpy
     b_.SetInsertPoint(left_block);
-    auto scoped_del_left = accept(ternary.left);
+    auto scoped_del_left = accept(ternary.left.get());
     b_.CREATE_MEMCPY(buf, expr_, ternary.type.size, 1);
     b_.CreateBr(done);
 
     b_.SetInsertPoint(right_block);
-    auto scoped_del_right = accept(ternary.right);
+    auto scoped_del_right = accept(ternary.right.get());
     b_.CREATE_MEMCPY(buf, expr_, ternary.type.size, 1);
     b_.CreateBr(done);
 
@@ -1377,7 +1377,7 @@ void CodegenLLVM::visit(Ternary &ternary)
     b_.CreateBr(done);
     b_.SetInsertPoint(right_block);
     {
-      auto scoped_del = accept(ternary.right);
+      auto scoped_del = accept(ternary.right.get());
     }
     b_.CreateBr(done);
     b_.SetInsertPoint(done);

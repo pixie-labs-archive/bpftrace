@@ -173,8 +173,8 @@ void Variable::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Binop::Binop(Expression *left, int op, Expression *right, location loc)
-    : Expression(loc), left(left), right(right), op(op)
+Binop::Binop(std::unique_ptr<Expression> left, int op,std::unique_ptr< Expression> right, location loc)
+    : Expression(loc), left(std::move(left)), right(std::move(right)), op(op)
 {
 }
 
@@ -182,13 +182,13 @@ void Binop::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Unop::Unop(int op, Expression *expr, location loc)
-    : Expression(loc), expr(expr), op(op), is_post_op(false)
+Unop::Unop(int op, std::unique_ptr<Expression> expr, location loc)
+    : Expression(loc), expr(std::move(expr)), op(op), is_post_op(false)
 {
 }
 
-Unop::Unop(int op, Expression *expr, bool is_post_op, location loc)
-    : Expression(loc), expr(expr), op(op), is_post_op(is_post_op)
+Unop::Unop(int op, std::unique_ptr<Expression> expr, bool is_post_op, location loc)
+    : Expression(loc), expr(std::move(expr)), op(op), is_post_op(is_post_op)
 {
 }
 
@@ -196,16 +196,16 @@ void Unop::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Ternary::Ternary(Expression *cond, Expression *left, Expression *right)
-    : cond(cond), left(left), right(right)
+Ternary::Ternary(std::unique_ptr<Expression> cond, std::unique_ptr<Expression> left, std::unique_ptr<Expression> right)
+    : cond(std::move(cond)), left(std::move(left)), right(std::move(right))
 {
 }
 
-Ternary::Ternary(Expression *cond,
-                 Expression *left,
-                 Expression *right,
+Ternary::Ternary(std::unique_ptr<Expression> cond,
+                 std::unique_ptr<Expression> left,
+                 std::unique_ptr<Expression> right,
                  location loc)
-    : Expression(loc), cond(cond), left(left), right(right)
+    : Expression(loc), cond(std::move(cond)), left(std::move(left)), right(std::move(right))
 {
 }
 
@@ -354,8 +354,8 @@ void If::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Unroll::Unroll(Expression *expr, std::unique_ptr<StatementList> stmts, location loc)
-    : Statement(loc), expr(expr), stmts(std::move(stmts))
+Unroll::Unroll(std::unique_ptr<expr>, std::unique_ptr<StatementList> stmts, location loc)
+    : Statement(loc), expr(std::move(expr)), stmts(std::move(stmts))
 {
 }
 
