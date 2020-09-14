@@ -103,7 +103,9 @@ public:
   explicit Call(const std::string &func);
   explicit Call(const std::string &func, location loc);
   Call(const std::string &func, std::unique_ptr<ExpressionList> vargs);
-  Call(const std::string &func, std::unique_ptr<ExpressionList> vargs, location loc);
+  Call(const std::string &func,
+       std::unique_ptr<ExpressionList> vargs,
+       location loc);
   std::string func;
   std::unique_ptr<ExpressionList> vargs;
 
@@ -114,7 +116,10 @@ class Map : public Expression {
 public:
   explicit Map(const std::string &ident, location loc);
   Map(const std::string &ident, std::unique_ptr<ExpressionList> vargs);
-  Map(const std::string &ident, std::unique_ptr<ExpressionList> vargs, location loc);
+  Map(const std::string &ident,
+      std::unique_ptr<ExpressionList> vargs,
+      location loc);
+  explicit Map(const Map &m);
   std::string ident;
   std::unique_ptr<ExpressionList> vargs;
   bool skip_key_validation = false;
@@ -126,6 +131,7 @@ class Variable : public Expression {
 public:
   explicit Variable(const std::string &ident);
   explicit Variable(const std::string &ident, location loc);
+  explicit Variable(const Variable &var);
   std::string ident;
 
   void accept(Visitor &v) override;
@@ -133,7 +139,10 @@ public:
 
 class Binop : public Expression {
 public:
-  Binop(std::unique_ptr<Expression> left, int op, std::unique_ptr<Expression> right, location loc);
+  Binop(std::unique_ptr<Expression> left,
+        int op,
+        std::unique_ptr<Expression> right,
+        location loc);
   std::unique_ptr<Expression> left, right;
   int op;
 
@@ -157,7 +166,9 @@ public:
 class FieldAccess : public Expression {
 public:
   FieldAccess(std::unique_ptr<Expression> expr, const std::string &field);
-  FieldAccess(std::unique_ptr<Expression> expr, const std::string &field, location loc);
+  FieldAccess(std::unique_ptr<Expression> expr,
+              const std::string &field,
+              location loc);
   FieldAccess(std::unique_ptr<Expression> expr, ssize_t index, location loc);
   std::unique_ptr<Expression> expr;
   std::string field;
@@ -168,8 +179,11 @@ public:
 
 class ArrayAccess : public Expression {
 public:
-  ArrayAccess(std::unique_ptr<Expression> expr, std::unique_ptr<Expression> indexpr);
-  ArrayAccess(std::unique_ptr<Expression> expr, std::unique_ptr<Expression> indexpr, location loc);
+  ArrayAccess(std::unique_ptr<Expression> expr,
+              std::unique_ptr<Expression> indexpr);
+  ArrayAccess(std::unique_ptr<Expression> expr,
+              std::unique_ptr<Expression> indexpr,
+              location loc);
   std::unique_ptr<Expression> expr;
   std::unique_ptr<Expression> indexpr;
 
@@ -178,7 +192,9 @@ public:
 
 class Cast : public Expression {
 public:
-  Cast(const std::string &type, bool is_pointer, std::unique_ptr<Expression> expr);
+  Cast(const std::string &type,
+       bool is_pointer,
+       std::unique_ptr<Expression> expr);
   Cast(const std::string &type,
        bool is_pointer,
        std::unique_ptr<Expression> expr,
@@ -217,7 +233,9 @@ public:
 
 class AssignMapStatement : public Statement {
 public:
-  AssignMapStatement(std::unique_ptr<Map> map, std::unique_ptr<Expression> expr, location loc = location());
+  AssignMapStatement(std::unique_ptr<Map> map,
+                     std::unique_ptr<Expression> expr,
+                     location loc = location());
   std::unique_ptr<Map> map;
   std::unique_ptr<Expression> expr;
 
@@ -226,8 +244,11 @@ public:
 
 class AssignVarStatement : public Statement {
 public:
-  AssignVarStatement(std::unique_ptr<Variable> var, std::unique_ptr<Expression> expr);
-  AssignVarStatement(std::unique_ptr<Variable> var, std::unique_ptr<Expression> expr, location loc);
+  AssignVarStatement(std::unique_ptr<Variable> var,
+                     std::unique_ptr<Expression> expr);
+  AssignVarStatement(std::unique_ptr<Variable> var,
+                     std::unique_ptr<Expression> expr,
+                     location loc);
   std::unique_ptr<Variable> var;
   std::unique_ptr<Expression> expr;
 
@@ -237,7 +258,9 @@ public:
 class If : public Statement {
 public:
   If(std::unique_ptr<Expression> cond, std::unique_ptr<StatementList> stmts);
-  If(std::unique_ptr<Expression> cond, std::unique_ptr<StatementList> stmts, std::unique_ptr<StatementList> else_stmts);
+  If(std::unique_ptr<Expression> cond,
+     std::unique_ptr<StatementList> stmts,
+     std::unique_ptr<StatementList> else_stmts);
   std::unique_ptr<Expression> cond;
   std::unique_ptr<StatementList> stmts = nullptr;
   std::unique_ptr<StatementList> else_stmts = nullptr;
@@ -247,7 +270,9 @@ public:
 
 class Unroll : public Statement {
 public:
-  Unroll(std::unique_ptr<Expression> expr, std::unique_ptr<StatementList> stmts, location loc);
+  Unroll(std::unique_ptr<Expression> expr,
+         std::unique_ptr<StatementList> stmts,
+         location loc);
   long int var = 0;
   std::unique_ptr<Expression> expr;
   std::unique_ptr<StatementList> stmts;
@@ -279,8 +304,13 @@ public:
 
 class Ternary : public Expression {
 public:
-  Ternary(std::unique_ptr<Expression> cond, std::unique_ptr<Expression> left, std::unique_ptr<Expression> right);
-  Ternary(std::unique_ptr<Expression> cond, std::unique_ptr<Expression> left, std::unique_ptr<Expression> right, location loc);
+  Ternary(std::unique_ptr<Expression> cond,
+          std::unique_ptr<Expression> left,
+          std::unique_ptr<Expression> right);
+  Ternary(std::unique_ptr<Expression> cond,
+          std::unique_ptr<Expression> left,
+          std::unique_ptr<Expression> right,
+          location loc);
   std::unique_ptr<Expression> cond, left, right;
 
   void accept(Visitor &v) override;
@@ -289,7 +319,9 @@ public:
 class While : public Statement
 {
 public:
-  While(std::unique_ptr<Expression> cond, std::unique_ptr<StatementList> stmts, location loc)
+  While(std::unique_ptr<Expression> cond,
+        std::unique_ptr<StatementList> stmts,
+        location loc)
       : cond(std::move(cond)), stmts(std::move(stmts)), loc(loc)
   {
   }
@@ -333,7 +365,9 @@ using AttachPointList = std::vector<std::unique_ptr<AttachPoint>>;
 
 class Probe : public Node {
 public:
-  Probe(std::unique_ptr<AttachPointList> attach_points, std::unique_ptr<Predicate> pred, std::unique_ptr<StatementList> stmts);
+  Probe(std::unique_ptr<AttachPointList> attach_points,
+        std::unique_ptr<Predicate> pred,
+        std::unique_ptr<StatementList> stmts);
 
   std::unique_ptr<AttachPointList> attach_points;
   std::unique_ptr<Predicate> pred;
