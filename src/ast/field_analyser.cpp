@@ -371,7 +371,7 @@ void FieldAnalyser::visit(Probe &probe)
   has_mixed_args_ = false;
   probe_ = &probe;
 
-  for (AttachPoint *ap : *probe.attach_points) {
+  for (auto& ap : *probe.attach_points) {
     ap->accept(*this);
     ProbeType pt = probetype(ap->provider);
     prog_type_ = progtype(pt);
@@ -379,14 +379,14 @@ void FieldAnalyser::visit(Probe &probe)
   if (probe.pred) {
     probe.pred->accept(*this);
   }
-  for (Statement *stmt : *probe.stmts) {
+  for (auto& stmt : *probe.stmts) {
     stmt->accept(*this);
   }
 }
 
 void FieldAnalyser::visit(Program &program)
 {
-  for (Probe *probe : *program.probes)
+  for (auto& probe : *program.probes)
     probe->accept(*this);
 }
 

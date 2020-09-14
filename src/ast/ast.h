@@ -236,21 +236,21 @@ public:
 
 class If : public Statement {
 public:
-  If(Expression *cond, StatementList *stmts);
-  If(Expression *cond, StatementList *stmts, StatementList *else_stmts);
+  If(Expression *cond, std::unique_ptr<StatementList> stmts);
+  If(Expression *cond, std::unique_ptr<StatementList> stmts, std::unique_ptr<StatementList> else_stmts);
   Expression *cond;
-  StatementList *stmts = nullptr;
-  StatementList *else_stmts = nullptr;
+  std::unique_ptr<StatementList> stmts = nullptr;
+  std::unique_ptr<StatementList> else_stmts = nullptr;
 
   void accept(Visitor &v) override;
 };
 
 class Unroll : public Statement {
 public:
-  Unroll(Expression *expr, StatementList *stmts, location loc);
+  Unroll(Expression *expr, std::unique_ptr<StatementList> stmts, location loc);
   long int var = 0;
   Expression *expr;
-  StatementList *stmts;
+  std::unique_ptr<StatementList> stmts;
 
   void accept(Visitor &v) override;
 };
@@ -289,12 +289,12 @@ public:
 class While : public Statement
 {
 public:
-  While(Expression *cond, StatementList *stmts, location loc)
-      : cond(cond), stmts(stmts), loc(loc)
+  While(Expression *cond, std::unique_ptr<StatementList> stmts, location loc)
+      : cond(cond), stmts(std::move(stmts)), loc(loc)
   {
   }
   Expression *cond;
-  StatementList *stmts = nullptr;
+  std::unique_ptr<StatementList> stmts = nullptr;
   location loc;
 
   void accept(Visitor &v) override;
@@ -329,15 +329,15 @@ public:
 private:
   std::map<std::string, int> index_;
 };
-using AttachPointList = std::vector<AttachPoint *>;
+using AttachPointList = std::vector<std::unique_ptr<AttachPoint>>;
 
 class Probe : public Node {
 public:
-  Probe(AttachPointList *attach_points, Predicate *pred, StatementList *stmts);
+  Probe(std::unique_ptr<AttachPointList> attach_points, std::unique_ptr<Predicate> pred, std::unique_ptr<StatementList> stmts);
 
-  AttachPointList *attach_points;
-  Predicate *pred;
-  StatementList *stmts;
+  std::unique_ptr<AttachPointList> attach_points;
+  std::unique_ptr<Predicate> pred;
+  std::unique_ptr<StatementList> stmts;
 
   void accept(Visitor &v) override;
   std::string name() const;
@@ -349,13 +349,13 @@ public:
 private:
   int index_ = 0;
 };
-using ProbeList = std::vector<Probe *>;
+using ProbeList = std::vector<std::unique_ptr<Probe>>;
 
 class Program : public Node {
 public:
-  Program(const std::string &c_definitions, ProbeList *probes);
+  Program(const std::string &c_definitions, std::unique_ptr<ProbeList> probes);
   std::string c_definitions;
-  ProbeList *probes;
+  std::unique_ptr<ProbeList> probes;
 
   void accept(Visitor &v) override;
 };

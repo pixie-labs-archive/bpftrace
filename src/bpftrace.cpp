@@ -196,7 +196,7 @@ BPFtrace::~BPFtrace()
 
 int BPFtrace::add_probe(ast::Probe &p)
 {
-  for (auto attach_point : *p.attach_points)
+  for (auto& attach_point : *p.attach_points)
   {
     if (attach_point->provider == "BEGIN" || attach_point->provider == "END")
     {
@@ -1156,6 +1156,7 @@ int BPFtrace::setup_perf_events()
       LOG(ERROR) << "Failed to open perf buffer";
       return -1;
     }
+    open_perf_buffers_.emplace_back(reader, perf_reader_free);
 
     struct epoll_event ev = {};
     ev.events = EPOLLIN;

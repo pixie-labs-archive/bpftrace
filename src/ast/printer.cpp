@@ -337,7 +337,7 @@ void Printer::visit(AttachPoint &ap)
 
 void Printer::visit(Probe &probe)
 {
-  for (AttachPoint *ap : *probe.attach_points) {
+  for (auto& ap : *probe.attach_points) {
     ap->accept(*this);
   }
 
@@ -360,7 +360,7 @@ void Printer::visit(Program &program)
   out_ << indent << "Program" << std::endl;
 
   ++depth_;
-  for (Probe *probe : *program.probes)
+  for (auto& probe : *program.probes)
     probe->accept(*this);
   --depth_;
 }

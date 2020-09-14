@@ -1923,7 +1923,7 @@ void CodegenLLVM::generateProbe(Probe &probe,
   ctx_ = func->arg_begin();
   if (probe.pred)
   {
-    auto scoped_del = accept(probe.pred);
+    auto scoped_del = accept(probe.pred.get());
   }
   variables_.clear();
   for (Statement *stmt : *probe.stmts)
@@ -1947,7 +1947,7 @@ void CodegenLLVM::visit(Probe &probe)
   if (probetype(attach_point->provider) == ProbeType::usdt)
     probe.need_expansion = true;
 
-  current_attach_point_ = attach_point;
+  current_attach_point_ = attach_point.get();
 
   /*
    * Most of the time, we can take a probe like kprobe:do_f* and build a
@@ -1986,8 +1986,8 @@ void CodegenLLVM::visit(Probe &probe)
       non_map_print_id_ = starting_non_map_print_id;
     };
 
-    for (auto attach_point : *probe.attach_points) {
-      current_attach_point_ = attach_point;
+    for (auto& attach_point : *probe.attach_points) {
+      current_attach_point_ = attach_point.get();
 
       std::set<std::string> matches;
       if (attach_point->provider == "BEGIN" || attach_point->provider == "END") {
@@ -2081,8 +2081,8 @@ void CodegenLLVM::visit(Probe &probe)
 
 void CodegenLLVM::visit(Program &program)
 {
-  for (Probe *probe : *program.probes)
-    auto scoped_del = accept(probe);
+  for (auto& probe : *program.probes)
+    auto scoped_del = accept(probe.get());
 }
 
 int CodegenLLVM::getNextIndexForProbe(const std::string &probe_name) {

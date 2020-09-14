@@ -341,7 +341,7 @@ void SemanticAnalyser::visit(Builtin &builtin)
       if (type == ProbeType::tracepoint)
       {
         probe_->need_expansion = true;
-        builtin_args_tracepoint(attach_point, builtin);
+        builtin_args_tracepoint(attach_point.get(), builtin);
       }
     }
 
@@ -1463,10 +1463,10 @@ void SemanticAnalyser::visit(If &if_block)
       LOG(ERROR, if_block.loc, err_) << "Invalid condition in if(): " << cond;
   }
 
-  accept_statements(if_block.stmts);
+  accept_statements(if_block.stmts.get());
 
   if (if_block.else_stmts)
-    accept_statements(if_block.else_stmts);
+    accept_statements(if_block.else_stmts.get());
 }
 
 void SemanticAnalyser::visit(Unroll &unroll)
@@ -1510,7 +1510,7 @@ void SemanticAnalyser::visit(Unroll &unroll)
   }
 
   for (int i = 0; i < unroll.var; i++)
-    accept_statements(unroll.stmts);
+    accept_statements(unroll.stmts.get());
 }
 
 void SemanticAnalyser::visit(Jump &jump)
@@ -1542,7 +1542,7 @@ void SemanticAnalyser::visit(While &while_block)
   while_block.cond->accept(*this);
 
   loop_depth_++;
-  accept_statements(while_block.stmts);
+  accept_statements(while_block.stmts.get());
   loop_depth_--;
 }
 
@@ -1625,7 +1625,7 @@ void SemanticAnalyser::visit(FieldAccess &acc)
 
   if (type.is_tparg)
   {
-    for (AttachPoint *attach_point : *probe_->attach_points)
+    for (auto& attach_point : *probe_->attach_points)
     {
       if (probetype(attach_point->provider) != ProbeType::tracepoint)
       {
@@ -2214,13 +2214,13 @@ void SemanticAnalyser::visit(Probe &probe)
   variable_val_.clear();
   probe_ = &probe;
 
-  for (AttachPoint *ap : *probe.attach_points) {
+  for (auto& ap : *probe.attach_points) {
     ap->accept(*this);
   }
   if (probe.pred) {
     probe.pred->accept(*this);
   }
-  for (Statement *stmt : *probe.stmts) {
+  for (Statement *stmt : *probe.stmts.get()) {
     stmt->accept(*this);
   }
 
@@ -2228,7 +2228,7 @@ void SemanticAnalyser::visit(Probe &probe)
 
 void SemanticAnalyser::visit(Program &program)
 {
-  for (Probe *probe : *program.probes)
+  for (auto& probe : *program.probes)
     probe->accept(*this);
 }
 

@@ -108,18 +108,18 @@ public:
   void visit(__attribute__((unused)) AttachPoint &ap) override { };  // Leaf
   void visit(Probe &probe) override {
     probe_ = &probe;
-    for (AttachPoint *ap : *probe.attach_points) {
+    for (auto& ap : *probe.attach_points) {
       ap->accept(*this);
     }
     if (probe.pred) {
       probe.pred->accept(*this);
     }
-    for (Statement *stmt : *probe.stmts) {
+    for (auto& stmt : *probe.stmts) {
       stmt->accept(*this);
     }
   };
   void visit(Program &program) override {
-    for (Probe *probe : *program.probes)
+    for (auto& probe : *program.probes)
       probe->accept(*this);
   };
 

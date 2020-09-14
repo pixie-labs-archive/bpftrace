@@ -115,19 +115,19 @@ void yyerror(bpftrace::Driver &driver, const char *s);
 %token <std::string> STACK_MODE "stack_mode"
 
 %type <std::string> c_definitions
-%type <ast::ProbeList *> probes
-%type <ast::Probe *> probe
-%type <ast::Predicate *> pred
+%type <std::unique_ptr<ast::ProbeList>> probes
+%type <std::unique_ptr<ast::Probe>> probe
+%type <std::unique_ptr<ast::Predicate>> pred
 %type <ast::Ternary *> ternary
-%type <ast::StatementList *> block stmts block_or_if
+%type <std::unique_ptr<ast::StatementList>> block stmts block_or_if
 %type <ast::Statement *> if_stmt block_stmt stmt semicolon_ended_stmt compound_assignment jump_stmt loop_stmt
 %type <ast::Expression *> expr
 %type <ast::Call *> call
 %type <ast::Map *> map
 %type <ast::Variable *> var
 %type <ast::ExpressionList *> vargs
-%type <ast::AttachPointList *> attach_points
-%type <ast::AttachPoint *> attach_point
+%type <std::unique_ptr<ast::AttachPointList>> attach_points
+%type <std::unique_ptr<ast::AttachPoint>> attach_point
 %type <std::string> attach_point_def
 %type <ast::PositionalParameter *> param
 %type <std::string> ident
@@ -154,7 +154,7 @@ void yyerror(bpftrace::Driver &driver, const char *s);
 
 %%
 
-program : c_definitions probes { driver.root_ = new ast::Program($1, $2); }
+program : c_definitions probes { driver.root_ = std::unique_ptr<ast::Program>(new ast::Program($1, std::move($2))); }
         ;
 
 c_definitions : CPREPROC c_definitions    { $$ = $1 + "\n" + $2; }
@@ -163,18 +163,18 @@ c_definitions : CPREPROC c_definitions    { $$ = $1 + "\n" + $2; }
               |                           { $$ = std::string(); }
               ;
 
-probes : probes probe { $$ = $1; $1->push_back($2); }
-       | probe        { $$ = new ast::ProbeList; $$->push_back($1); }
+probes : probes probe { $1->push_back(std::move($2)); $$ = std::move($1); }
+       | probe        { $$ = std::make_unique<ast::ProbeList>(); $$->push_back(std::move($1)); }
        ;
 
-probe : attach_points pred block { $$ = new ast::Probe($1, $2, $3); }
+probe : attach_points pred block { $$ = std::make_unique<ast::Probe>(std::move($1), std::move($2), std::move($3)); }
       ;
 
-attach_points : attach_points "," attach_point { $$ = $1; $1->push_back($3); }
-              | attach_point                   { $$ = new ast::AttachPointList; $$->push_back($1); }
+attach_points : attach_points "," attach_point { $1->push_back(std::move($3)); $$ = std::move($1); }
+              | attach_point                   { $$ = std::make_unique<ast::AttachPointList>(); $$->push_back(std::move($1)); }
               ;
 
-attach_point : attach_point_def                { $$ = new ast::AttachPoint($1, @$); }
+attach_point : attach_point_def                { $$ = std::make_unique<ast::AttachPoint>($1, @$); }
              ;
 
 attach_point_def : attach_point_def ident    { $$ = $1 + $2; }
@@ -206,7 +206,7 @@ attach_point_def : attach_point_def ident    { $$ = $1 + $2; }
                  |                           { $$ = ""; }
                  ;
 
-pred : DIV expr ENDPRED { $$ = new ast::Predicate($2, @$); }
+pred : DIV expr ENDPRED { $$ = std::make_unique<ast::Predicate>($2, @$); }
      |                  { $$ = nullptr; }
      ;
 
@@ -225,16 +225,16 @@ param : PARAM      {
       | PARAMCOUNT { $$ = new ast::PositionalParameter(PositionalParameterType::count, 0, @$); }
       ;
 
-block : "{" stmts "}"     { $$ = $2; }
+block : "{" stmts "}"     { $$ = std::move($2); }
       ;
 
 semicolon_ended_stmt: stmt ";"  { $$ = $1; }
                     ;
 
-stmts : semicolon_ended_stmt stmts { $$ = $2; $2->insert($2->begin(), $1); }
-      | block_stmt stmts           { $$ = $2; $2->insert($2->begin(), $1); }
-      | stmt                       { $$ = new ast::StatementList; $$->push_back($1); }
-      |                            { $$ = new ast::StatementList; }
+stmts : semicolon_ended_stmt stmts { $2->insert($2->begin(), $1); $$ = std::move($2); }
+      | block_stmt stmts           { $2->insert($2->begin(), $1); $$ = std::move($2); }
+      | stmt                       { $$ = std::make_unique<ast::StatementList>(); $$->push_back($1); }
+      |                            { $$ = std::make_unique<ast::StatementList>(); }
       ;
 
 block_stmt : if_stmt                  { $$ = $1; }
@@ -247,17 +247,17 @@ jump_stmt  : BREAK    { $$ = new ast::Jump(token::BREAK, @$); }
            | RETURN   { $$ = new ast::Jump(token::RETURN, @$); }
            ;
 
-loop_stmt  : UNROLL "(" int ")" block             { $$ = new ast::Unroll($3, $5, @1 + @4); }
-           | UNROLL "(" param ")" block           { $$ = new ast::Unroll($3, $5, @1 + @4); }
-           | WHILE  "(" expr ")" block            { $$ = new ast::While($3, $5, @1); }
+loop_stmt  : UNROLL "(" int ")" block             { $$ = new ast::Unroll($3, std::move($5), @1 + @4); }
+           | UNROLL "(" param ")" block           { $$ = new ast::Unroll($3, std::move($5), @1 + @4); }
+           | WHILE  "(" expr ")" block            { $$ = new ast::While($3, std::move($5), @1); }
            ;
 
-if_stmt : IF "(" expr ")" block                  { $$ = new ast::If($3, $5); }
-        | IF "(" expr ")" block ELSE block_or_if { $$ = new ast::If($3, $5, $7); }
+if_stmt : IF "(" expr ")" block                  { $$ = new ast::If($3, std::move($5)); }
+        | IF "(" expr ")" block ELSE block_or_if { $$ = new ast::If($3, std::move($5), std::move($7)); }
         ;
 
-block_or_if : block        { $$ = $1; }
-            | if_stmt      { $$ = new ast::StatementList; $$->emplace_back($1); }
+block_or_if : block        { $$ = std::move($1); }
+            | if_stmt      { $$ = std::make_unique<ast::StatementList>(); $$->emplace_back(std::move($1)); }
             ;
 
 stmt : expr                { $$ = new ast::ExprStatement($1); }

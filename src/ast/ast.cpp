@@ -341,12 +341,12 @@ void AttachPoint::accept(Visitor &v) {
   v.visit(*this);
 }
 
-If::If(Expression *cond, StatementList *stmts) : cond(cond), stmts(stmts)
+If::If(Expression *cond, std::unique_ptr<StatementList> stmts) : cond(cond), stmts(std::move(stmts))
 {
 }
 
-If::If(Expression *cond, StatementList *stmts, StatementList *else_stmts)
-    : cond(cond), stmts(stmts), else_stmts(else_stmts)
+If::If(Expression *cond, std::unique_ptr<StatementList> stmts, std::unique_ptr<StatementList> else_stmts)
+    : cond(cond), stmts(std::move(stmts)), else_stmts(std::move(else_stmts))
 {
 }
 
@@ -354,8 +354,8 @@ void If::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Unroll::Unroll(Expression *expr, StatementList *stmts, location loc)
-    : Statement(loc), expr(expr), stmts(stmts)
+Unroll::Unroll(Expression *expr, std::unique_ptr<StatementList> stmts, location loc)
+    : Statement(loc), expr(expr), stmts(std::move(stmts))
 {
 }
 
@@ -363,10 +363,10 @@ void Unroll::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Probe::Probe(AttachPointList *attach_points,
-             Predicate *pred,
-             StatementList *stmts)
-    : attach_points(attach_points), pred(pred), stmts(stmts)
+Probe::Probe(std::unique_ptr<AttachPointList> attach_points,
+             std::unique_ptr<Predicate> pred,
+             std::unique_ptr<StatementList> stmts)
+    : attach_points(std::move(attach_points)), pred(std::move(pred)), stmts(std::move(stmts))
 {
 }
 
@@ -384,8 +384,8 @@ void Probe::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Program::Program(const std::string &c_definitions, ProbeList *probes)
-    : c_definitions(c_definitions), probes(probes)
+Program::Program(const std::string &c_definitions, std::unique_ptr<ProbeList> probes)
+    : c_definitions(c_definitions), probes(std::move(probes))
 {
 }
 
