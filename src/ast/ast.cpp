@@ -148,7 +148,7 @@ Map::Map(const std::string &ident, std::unique_ptr<ExpressionList> vargs, locati
     : Expression(loc), ident(ident), vargs(std::move(vargs))
 {
   is_map = true;
-  for (auto& expr : *vargs)
+  for (auto& expr : *this->vargs)
   {
     expr->key_for_map = this;
   }
@@ -295,7 +295,7 @@ void ExprStatement::accept(Visitor &v) {
 AssignMapStatement::AssignMapStatement(std::unique_ptr<Map> map, std::unique_ptr<Expression> expr, location loc)
     : Statement(loc), map(std::move(map)), expr(std::move(expr))
 {
-  expr->map = map.get();
+  this->expr->map = map.get();
 };
 
 void AssignMapStatement::accept(Visitor &v) {
@@ -305,7 +305,7 @@ void AssignMapStatement::accept(Visitor &v) {
 AssignVarStatement::AssignVarStatement(std::unique_ptr<Variable> var, std::unique_ptr<Expression> expr)
     : var(std::move(var)), expr(std::move(expr))
 {
-  expr->var = var.get();
+  this->expr->var = var.get();
 }
 
 AssignVarStatement::AssignVarStatement(std::unique_ptr<Variable> var,
@@ -313,7 +313,7 @@ AssignVarStatement::AssignVarStatement(std::unique_ptr<Variable> var,
                                        location loc)
     : Statement(loc), var(std::move(var)), expr(std::move(expr))
 {
-  expr->var = var.get();
+  this->expr->var = var.get();
 }
 
 void AssignVarStatement::accept(Visitor &v) {
