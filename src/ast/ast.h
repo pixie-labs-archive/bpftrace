@@ -37,7 +37,7 @@ public:
   bool is_variable = false;
   bool is_map = false;
 };
-using ExpressionList = std::vector<Expression *>;
+using ExpressionList = std::vector<std::unique_ptr<Expression>>;
 
 class Integer : public Expression {
 public:
@@ -102,10 +102,10 @@ class Call : public Expression {
 public:
   explicit Call(const std::string &func);
   explicit Call(const std::string &func, location loc);
-  Call(const std::string &func, ExpressionList *vargs);
-  Call(const std::string &func, ExpressionList *vargs, location loc);
+  Call(const std::string &func, std::unique_ptr<ExpressionList> vargs);
+  Call(const std::string &func, std::unique_ptr<ExpressionList> vargs, location loc);
   std::string func;
-  ExpressionList *vargs;
+  std::unique_ptr<ExpressionList> vargs;
 
   void accept(Visitor &v) override;
 };
@@ -113,10 +113,10 @@ public:
 class Map : public Expression {
 public:
   explicit Map(const std::string &ident, location loc);
-  Map(const std::string &ident, ExpressionList *vargs);
-  Map(const std::string &ident, ExpressionList *vargs, location loc);
+  Map(const std::string &ident, std::unique_ptr<ExpressionList> vargs);
+  Map(const std::string &ident, std::unique_ptr<ExpressionList> vargs, location loc);
   std::string ident;
-  ExpressionList *vargs;
+  std::unique_ptr<ExpressionList> vargs;
   bool skip_key_validation = false;
 
   void accept(Visitor &v) override;
@@ -193,8 +193,8 @@ public:
 class Tuple : public Expression
 {
 public:
-  Tuple(ExpressionList *elems, location loc);
-  ExpressionList *elems;
+  Tuple(std::unique_ptr<ExpressionList> elems, location loc);
+  std::unique_ptr<ExpressionList> elems;
 
   void accept(Visitor &v) override;
 };
@@ -204,7 +204,7 @@ public:
   Statement() = default;
   Statement(location loc);
 };
-using StatementList = std::vector<Statement *>;
+using StatementList = std::vector<std::unique_ptr<Statement>>;
 
 class ExprStatement : public Statement {
 public:
@@ -217,8 +217,8 @@ public:
 
 class AssignMapStatement : public Statement {
 public:
-  AssignMapStatement(Map *map, std::unique_ptr<Expression> expr, location loc = location());
-  Map *map;
+  AssignMapStatement(std::unique_ptr<Map> map, std::unique_ptr<Expression> expr, location loc = location());
+  std::unique_ptr<Map> map;
   std::unique_ptr<Expression> expr;
 
   void accept(Visitor &v) override;
@@ -226,9 +226,9 @@ public:
 
 class AssignVarStatement : public Statement {
 public:
-  AssignVarStatement(Variable *var, std::unique_ptr<Expression> expr);
-  AssignVarStatement(Variable *var, std::unique_ptr<Expression> expr, location loc);
-  Variable *var;
+  AssignVarStatement(std::unique_ptr<Variable> var, std::unique_ptr<Expression> expr);
+  AssignVarStatement(std::unique_ptr<Variable> var, std::unique_ptr<Expression> expr, location loc);
+  std::unique_ptr<Variable> var;
   std::unique_ptr<Expression> expr;
 
   void accept(Visitor &v) override;

@@ -118,13 +118,13 @@ Call::Call(const std::string &func, location loc)
 {
 }
 
-Call::Call(const std::string &func, ExpressionList *vargs)
-    : func(is_deprecated(func)), vargs(vargs)
+Call::Call(const std::string &func, std::unique_ptr<ExpressionList> vargs)
+    : func(is_deprecated(func)), vargs(std::move(vargs))
 {
 }
 
-Call::Call(const std::string &func, ExpressionList *vargs, location loc)
-    : Expression(loc), func(is_deprecated(func)), vargs(vargs)
+Call::Call(const std::string &func, std::unique_ptr<ExpressionList> vargs, location loc)
+    : Expression(loc), func(is_deprecated(func)), vargs(std::move(vargs))
 {
 }
 
@@ -138,17 +138,17 @@ Map::Map(const std::string &ident, location loc)
   is_map = true;
 }
 
-Map::Map(const std::string &ident, ExpressionList *vargs)
-    : ident(ident), vargs(vargs)
+Map::Map(const std::string &ident, std::unique_ptr<ExpressionList> vargs)
+    : ident(ident), vargs(std::move(vargs))
 {
   is_map = true;
 }
 
-Map::Map(const std::string &ident, ExpressionList *vargs, location loc)
-    : Expression(loc), ident(ident), vargs(vargs)
+Map::Map(const std::string &ident, std::unique_ptr<ExpressionList> vargs, location loc)
+    : Expression(loc), ident(ident), vargs(std::move(vargs))
 {
   is_map = true;
-  for (auto expr : *vargs)
+  for (auto& expr : *vargs)
   {
     expr->key_for_map = this;
   }
@@ -213,20 +213,20 @@ void Ternary::accept(Visitor &v) {
   v.visit(*this);
 }
 
-FieldAccess::FieldAccess(Expression *expr, const std::string &field)
-    : expr(expr), field(field)
+FieldAccess::FieldAccess(std::unique_ptr<Expression> expr, const std::string &field)
+    : expr(std::move(expr)), field(field)
 {
 }
 
-FieldAccess::FieldAccess(Expression *expr,
+FieldAccess::FieldAccess(std::unique_ptr<Expression> expr,
                          const std::string &field,
                          location loc)
-    : Expression(loc), expr(expr), field(field)
+    : Expression(loc), expr(std::move(expr)), field(field)
 {
 }
 
-FieldAccess::FieldAccess(Expression *expr, ssize_t index, location loc)
-    : Expression(loc), expr(expr), index(index)
+FieldAccess::FieldAccess(std::unique_ptr<Expression> expr, ssize_t index, location loc)
+    : Expression(loc), expr(std::move(expr)), index(index)
 {
 }
 
@@ -234,13 +234,13 @@ void FieldAccess::accept(Visitor &v) {
   v.visit(*this);
 }
 
-ArrayAccess::ArrayAccess(Expression *expr, Expression *indexpr)
-    : expr(expr), indexpr(indexpr)
+ArrayAccess::ArrayAccess(std::unique_ptr<Expression> expr, std::unique_ptr<Expression> indexpr)
+    : expr(std::move(expr)), indexpr(std::move(indexpr))
 {
 }
 
-ArrayAccess::ArrayAccess(Expression *expr, Expression *indexpr, location loc)
-    : Expression(loc), expr(expr), indexpr(indexpr)
+ArrayAccess::ArrayAccess(std::unique_ptr<Expression> expr, std::unique_ptr<Expression> indexpr, location loc)
+    : Expression(loc), expr(std::move(expr)), indexpr(std::move(indexpr))
 {
 }
 
@@ -248,16 +248,16 @@ void ArrayAccess::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Cast::Cast(const std::string &type, bool is_pointer, Expression *expr)
-    : cast_type(type), is_pointer(is_pointer), expr(expr)
+Cast::Cast(const std::string &type, bool is_pointer, std::unique_ptr<Expression> expr)
+    : cast_type(type), is_pointer(is_pointer), expr(std::move(expr))
 {
 }
 
 Cast::Cast(const std::string &type,
            bool is_pointer,
-           Expression *expr,
+           std::unique_ptr<Expression> expr,
            location loc)
-    : Expression(loc), cast_type(type), is_pointer(is_pointer), expr(expr)
+    : Expression(loc), cast_type(type), is_pointer(is_pointer), expr(std::move(expr))
 {
 }
 
@@ -265,8 +265,8 @@ void Cast::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Tuple::Tuple(ExpressionList *elems, location loc)
-    : Expression(loc), elems(elems)
+Tuple::Tuple(std::unique_ptr<ExpressionList> elems, location loc)
+    : Expression(loc), elems(std::move(elems))
 {
 }
 
@@ -279,12 +279,12 @@ Statement::Statement(location loc) : Node(loc)
 {
 }
 
-ExprStatement::ExprStatement(Expression *expr) : expr(expr)
+ExprStatement::ExprStatement(std::unique_ptr<Expression> expr) : expr(std::move(expr))
 {
 }
 
-ExprStatement::ExprStatement(Expression *expr, location loc)
-    : Statement(loc), expr(expr)
+ExprStatement::ExprStatement(std::unique_ptr<Expression> expr, location loc)
+    : Statement(loc), expr(std::move(expr))
 {
 }
 
@@ -292,39 +292,39 @@ void ExprStatement::accept(Visitor &v) {
   v.visit(*this);
 }
 
-AssignMapStatement::AssignMapStatement(Map *map, Expression *expr, location loc)
-    : Statement(loc), map(map), expr(expr)
+AssignMapStatement::AssignMapStatement(std::unique_ptr<Map> map, std::unique_ptr<Expression> expr, location loc)
+    : Statement(loc), map(std::move(map)), expr(std::move(expr))
 {
-  expr->map = map;
+  expr->map = map.get();
 };
 
 void AssignMapStatement::accept(Visitor &v) {
   v.visit(*this);
 }
 
-AssignVarStatement::AssignVarStatement(Variable *var, Expression *expr)
-    : var(var), expr(expr)
+AssignVarStatement::AssignVarStatement(std::unique_ptr<Variable> var, std::unique_ptr<Expression> expr)
+    : var(std::move(var)), expr(std::move(expr))
 {
-  expr->var = var;
+  expr->var = var.get();
 }
 
-AssignVarStatement::AssignVarStatement(Variable *var,
-                                       Expression *expr,
+AssignVarStatement::AssignVarStatement(std::unique_ptr<Variable> var,
+                                       std::unique_ptr<Expression> expr,
                                        location loc)
-    : Statement(loc), var(var), expr(expr)
+    : Statement(loc), var(std::move(var)), expr(std::move(expr))
 {
-  expr->var = var;
+  expr->var = var.get();
 }
 
 void AssignVarStatement::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Predicate::Predicate(Expression *expr) : expr(expr)
+Predicate::Predicate(std::unique_ptr<Expression> expr) : expr(std::move(expr))
 {
 }
 
-Predicate::Predicate(Expression *expr, location loc) : Node(loc), expr(expr)
+Predicate::Predicate(std::unique_ptr<Expression> expr, location loc) : Node(loc), expr(std::move(expr))
 {
 }
 
@@ -341,12 +341,12 @@ void AttachPoint::accept(Visitor &v) {
   v.visit(*this);
 }
 
-If::If(Expression *cond, std::unique_ptr<StatementList> stmts) : cond(cond), stmts(std::move(stmts))
+If::If(std::unique_ptr<Expression> cond, std::unique_ptr<StatementList> stmts) : cond(std::move(cond)), stmts(std::move(stmts))
 {
 }
 
-If::If(Expression *cond, std::unique_ptr<StatementList> stmts, std::unique_ptr<StatementList> else_stmts)
-    : cond(cond), stmts(std::move(stmts)), else_stmts(std::move(else_stmts))
+If::If(std::unique_ptr<Expression> cond, std::unique_ptr<StatementList> stmts, std::unique_ptr<StatementList> else_stmts)
+    : cond(std::move(cond)), stmts(std::move(stmts)), else_stmts(std::move(else_stmts))
 {
 }
 
@@ -354,7 +354,7 @@ void If::accept(Visitor &v) {
   v.visit(*this);
 }
 
-Unroll::Unroll(std::unique_ptr<expr>, std::unique_ptr<StatementList> stmts, location loc)
+Unroll::Unroll(std::unique_ptr<Expression> expr, std::unique_ptr<StatementList> stmts, location loc)
     : Statement(loc), expr(std::move(expr)), stmts(std::move(stmts))
 {
 }
