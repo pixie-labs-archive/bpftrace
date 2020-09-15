@@ -123,8 +123,8 @@ void yyerror(bpftrace::Driver &driver, const char *s);
 %type <std::unique_ptr<ast::Statement>> if_stmt block_stmt stmt semicolon_ended_stmt compound_assignment jump_stmt loop_stmt
 %type <std::unique_ptr<ast::Expression>> expr
 %type <std::unique_ptr<ast::Expression>> call
-%type <std::unique_ptr<ast::Expression>> map
-%type <std::unique_ptr<ast::Expression>> var
+%type <std::unique_ptr<ast::Map>> map
+%type <std::unique_ptr<ast::Variable>> var
 %type <std::unique_ptr<ast::ExpressionList>> vargs
 %type <std::unique_ptr<ast::AttachPointList>> attach_points
 %type <std::unique_ptr<ast::AttachPoint>> attach_point
@@ -262,30 +262,30 @@ block_or_if : block        { $$ = std::move($1); }
 stmt : expr                { $$ = std::unique_ptr<ast::Statement>(new ast::ExprStatement(std::move($1))); }
      | compound_assignment { $$ = std::move($1); }
      | jump_stmt           { $$ = std::move($1); }
-     | map "=" expr        { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::move($3), @2)); }
-     | var "=" expr        { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::move($3), @2)); }
+     | map "=" expr        { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::move($3), @2)); }
+     | var "=" expr        { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::move($3), @2)); }
      ;
 
-compound_assignment : map LEFTASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::LEFT, std::move($3), @2)))); }
-                    | var LEFTASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::LEFT, std::move($3), @2)))); }
-                    | map RIGHTASSIGN expr { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::RIGHT, std::move($3), @2)))); }
-                    | var RIGHTASSIGN expr { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::RIGHT, std::move($3), @2)))); }
-                    | map PLUSASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::PLUS, std::move($3), @2)))); }
-                    | var PLUSASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::PLUS, std::move($3), @2)))); }
-                    | map MINUSASSIGN expr { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MINUS, std::move($3), @2)))); }
-                    | var MINUSASSIGN expr { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MINUS, std::move($3), @2)))); }
-                    | map MULASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MUL, std::move($3), @2)))); }
-                    | var MULASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MUL, std::move($3), @2)))); }
-                    | map DIVASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::DIV, std::move($3), @2)))); }
-                    | var DIVASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::DIV, std::move($3), @2)))); }
-                    | map MODASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MOD, std::move($3), @2)))); }
-                    | var MODASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MOD, std::move($3), @2)))); }
-                    | map BANDASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BAND, std::move($3), @2)))); }
-                    | var BANDASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BAND, std::move($3), @2)))); }
-                    | map BORASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BOR, std::move($3), @2)))); }
-                    | var BORASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BOR, std::move($3), @2)))); }
-                    | map BXORASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::unique_ptr<ast::Map>(static_cast<ast::Map*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BXOR, std::move($3), @2)))); }
-                    | var BXORASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::unique_ptr<ast::Variable>(static_cast<ast::Variable*>($1.release())), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BXOR, std::move($3), @2)))); }
+compound_assignment : map LEFTASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::LEFT, std::move($3), @2)))); }
+                    | var LEFTASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::LEFT, std::move($3), @2)))); }
+                    | map RIGHTASSIGN expr { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::RIGHT, std::move($3), @2)))); }
+                    | var RIGHTASSIGN expr { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::RIGHT, std::move($3), @2)))); }
+                    | map PLUSASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::PLUS, std::move($3), @2)))); }
+                    | var PLUSASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::PLUS, std::move($3), @2)))); }
+                    | map MINUSASSIGN expr { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MINUS, std::move($3), @2)))); }
+                    | var MINUSASSIGN expr { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MINUS, std::move($3), @2)))); }
+                    | map MULASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MUL, std::move($3), @2)))); }
+                    | var MULASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MUL, std::move($3), @2)))); }
+                    | map DIVASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::DIV, std::move($3), @2)))); }
+                    | var DIVASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::DIV, std::move($3), @2)))); }
+                    | map MODASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MOD, std::move($3), @2)))); }
+                    | var MODASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::MOD, std::move($3), @2)))); }
+                    | map BANDASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BAND, std::move($3), @2)))); }
+                    | var BANDASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BAND, std::move($3), @2)))); }
+                    | map BORASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BOR, std::move($3), @2)))); }
+                    | var BORASSIGN expr   { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BOR, std::move($3), @2)))); }
+                    | map BXORASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignMapStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BXOR, std::move($3), @2)))); }
+                    | var BXORASSIGN expr  { $$ = std::unique_ptr<ast::Statement>(new ast::AssignVarStatement(std::move($1), std::unique_ptr<ast::Expression>(new ast::Binop(std::move($1), token::BXOR, std::move($3), @2)))); }
                     ;
 
 int : MINUS INT    { $$ = std::unique_ptr<ast::Expression>(new ast::Integer(-1 * $2, @$)); }
@@ -369,11 +369,11 @@ call : CALL "(" ")"                 { $$ = std::unique_ptr<ast::Expression>(new 
      | STACK_MODE "(" vargs ")"     { error(@1, "Unknown function: " + $1); YYERROR;  }
      ;
 
-map : MAP               { $$ = std::unique_ptr<ast::Expression>(new ast::Map($1, @$)); }
-    | MAP "[" vargs "]" { $$ = std::unique_ptr<ast::Expression>(new ast::Map($1, std::move($3), @$)); }
+map : MAP               { $$ = std::make_unique<ast::Map>($1, @$); }
+    | MAP "[" vargs "]" { $$ = std::make_unique<ast::Map>($1, std::move($3), @$); }
     ;
 
-var : VAR { $$ = std::unique_ptr<ast::Expression>(new ast::Variable($1, @$)); }
+var : VAR { $$ = std::unique_ptr<ast::Variable>(new ast::Variable($1, @$)); }
     ;
 
 map_or_var : var { $$ = std::move($1); }
