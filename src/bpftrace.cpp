@@ -1018,11 +1018,34 @@ int BPFtrace::run_special_probe(std::string name,
   return 0;
 }
 
-int BPFtrace::run(BpfOrc* bpforc, bool nonblocking)
+int BPFtrace::run() {
+  int status;
+
+  status = deploy();
+  if (status != 0) {
+    return status;
+  }
+
+  if (bt_verbose)
+    std::cerr << "Running..." << std::endl;
+
+  // Polls until interrupted with a signal.
+  bool stop = false;
+  while (!stop) {
+    stop = poll_perf_events(epollfd_);
+  }
+
+  // Run the END block and wrap-up.
+  status = finalize();
+
+  return status;
+}
+
+int BPFtrace::deploy()
 {
-  int epollfd = setup_perf_events();
-  if (epollfd < 0)
-    return epollfd;
+  epollfd_ = setup_perf_events();
+  if (epollfd_ < 0)
+    return epollfd_;
 
   if (maps.Has(MapManager::Type::Elapsed))
   {
@@ -1041,7 +1064,7 @@ int BPFtrace::run(BpfOrc* bpforc, bool nonblocking)
     }
   }
 
-  if (run_special_probe("BEGIN_trigger", *bpforc, BEGIN_trigger))
+  if (run_special_probe("BEGIN_trigger", *bpforc_, BEGIN_trigger))
     return -1;
 
   if (child_ && has_usdt_)
@@ -1066,7 +1089,7 @@ int BPFtrace::run(BpfOrc* bpforc, bool nonblocking)
   for (auto probes = probes_.begin(); probes != probes_.end(); ++probes)
   {
     if (!attach_reverse(*probes)) {
-      auto aps = attach_probe(*probes, *bpforc);
+      auto aps = attach_probe(*probes, *bpforc_);
 
       if (aps.empty())
         return -1;
@@ -1079,7 +1102,7 @@ int BPFtrace::run(BpfOrc* bpforc, bool nonblocking)
   for (auto r_probes = probes_.rbegin(); r_probes != probes_.rend(); ++r_probes)
   {
     if (attach_reverse(*r_probes)) {
-      auto aps = attach_probe(*r_probes, *bpforc);
+      auto aps = attach_probe(*r_probes, *bpforc_);
 
       if (aps.empty())
         return -1;
@@ -1106,37 +1129,22 @@ int BPFtrace::run(BpfOrc* bpforc, bool nonblocking)
     }
   }
 
-  if (bt_verbose)
-    std::cerr << "Running..." << std::endl;
-
-  if (!nonblocking) {
-    poll_perf_events(epollfd);
-    attached_probes_.clear();
-    // finalize_ and exitsig_recv should be false from now on otherwise
-    // perf_event_printer() can ignore the END_trigger() events.
-    finalize_ = false;
-    exitsig_recv = false;
-
-    if (run_special_probe("END_trigger", *bpforc, END_trigger))
-      return -1;
-
-    poll_perf_events(epollfd, true);
-  }
-
   return 0;
 }
 
-void BPFtrace::stop() {
+int BPFtrace::finalize() {
   attached_probes_.clear();
   // finalize_ and exitsig_recv should be false from now on otherwise
   // perf_event_printer() can ignore the END_trigger() events.
   finalize_ = false;
   exitsig_recv = false;
 
-//  if (run_special_probe("END_trigger", *bpforc, END_trigger))
-//    return -1;
+  if (run_special_probe("END_trigger", *bpforc_, END_trigger))
+    return -1;
 
-//  poll_perf_events(epollfd, true);
+  poll_perf_events(epollfd_, true);
+
+  return 0;
 }
 
 int BPFtrace::setup_perf_events()
@@ -1177,45 +1185,46 @@ int BPFtrace::setup_perf_events()
   return epollfd;
 }
 
-void BPFtrace::poll_perf_events(int epollfd, bool drain)
+// Non-zero value indicates that caller should finalize.
+int BPFtrace::poll_perf_events(bool drain, int timeout)
 {
   auto events = std::vector<struct epoll_event>(online_cpus_);
-  while (true)
-  {
-    int ready = epoll_wait(epollfd, events.data(), online_cpus_, 100);
-    if (ready < 0 && errno == EINTR && !BPFtrace::exitsig_recv) {
-      // We received an interrupt not caused by SIGINT, skip and run again
-      continue;
-    }
 
-    // Return if either
-    //   * epoll_wait has encountered an error (eg signal delivery)
-    //   * There's no events left and we've been instructed to drain or
-    //     finalization has been requested through exit() builtin.
-    if (ready < 0 || (ready == 0 && (drain || finalize_)))
-    {
-      return;
-    }
-
-    for (int i=0; i<ready; i++)
-    {
-      perf_reader_event_read((perf_reader*)events[i].data.ptr);
-    }
-
-    // If we are tracing a specific pid and it has exited, we should exit
-    // as well b/c otherwise we'd be tracing nothing.
-    if ((procmon_ && !procmon_->is_alive()) || (child_ && !child_->is_alive()))
-    {
-      return;
-    }
+  int ready = epoll_wait(epollfd_, events.data(), online_cpus_, timeout);
+  if (ready < 0 && errno == EINTR && !BPFtrace::exitsig_recv) {
+    // We received an interrupt not caused by SIGINT, skip and run again
+    return 0;
   }
-  return;
+
+  // Return if either
+  //   * epoll_wait has encountered an error (eg signal delivery)
+  //   * There's no events left and we've been instructed to drain or
+  //     finalization has been requested through exit() builtin.
+  if (ready < 0 || (ready == 0 && (drain || finalize_)))
+  {
+    return 1;
+  }
+
+  for (int i=0; i<ready; i++)
+  {
+    perf_reader_event_read((perf_reader*)events[i].data.ptr);
+  }
+
+  // If we are tracing a specific pid and it has exited, we should exit
+  // as well b/c otherwise we'd be tracing nothing.
+  if ((procmon_ && !procmon_->is_alive()) || (child_ && !child_->is_alive()))
+  {
+    return 1;
+  }
 }
 
 BPFTraceMap BPFtrace::get_map(const std::string& name) {
-  auto& mapmap = maps_[name];
-  IMap& map = *mapmap.get();
-  return get_map(map);
+  const auto& mapmap = maps[name];
+  if (mapmap.has_value()) {
+    IMap& map = *mapmap.value();
+    return get_map(map);
+  }
+
 }
 
 

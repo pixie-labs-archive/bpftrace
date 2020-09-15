@@ -97,8 +97,13 @@ public:
   virtual ~BPFtrace();
   virtual int add_probe(ast::Probe &p);
   int num_probes() const;
-  int run(BpfOrc* bpforc, bool nonblocking = false);
-  void stop();
+  // run() is a shortcut for the following sequence:
+  //   deploy(), poll_perf_events(), finalize()
+  // The latter model is intended for caller managed polling.
+  int run();
+  int deploy();
+  int poll_perf_events(bool drain = false, int timeout = 100);
+  int finalize();
   int print_maps();
   int clear_map(IMap &map);
   int zero_map(IMap &map);
@@ -131,6 +136,9 @@ public:
   size_t num_params() const;
   void request_finalize();
   bool is_aslr_enabled(int pid);
+
+  BpfOrc* bpforc_;
+  int epollfd_ = -1;
 
   std::string cmd_;
   bool finalize_ = false;
@@ -223,7 +231,6 @@ private:
       Probe &probe,
       const BpfOrc &bpforc);
   int setup_perf_events();
-  void poll_perf_events(int epollfd, bool drain = false);
   BPFTraceMap get_map(IMap &map);
   int print_map_hist(IMap &map, uint32_t top, uint32_t div);
   int print_map_stats(IMap &map, uint32_t top, uint32_t div);
