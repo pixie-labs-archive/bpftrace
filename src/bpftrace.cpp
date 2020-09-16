@@ -695,6 +695,11 @@ void perf_event_printer(void *cb_cookie, void *data, int size __attribute__((unu
   auto args = std::get<1>(bpftrace->printf_args_[printf_id]);
   auto arg_values = bpftrace->get_arg_values(args, arg_data);
 
+  if (bpftrace->printf_callback_) {
+    bpftrace->printf_callback_(args, arg_data);
+    return;
+  }
+
   bpftrace->out_->message(MessageType::printf, format(fmt, arg_values), false);
 }
 
@@ -1216,6 +1221,8 @@ int BPFtrace::poll_perf_events(bool drain, int timeout)
   {
     return 1;
   }
+
+  return 0;
 }
 
 BPFTraceMap BPFtrace::get_map(const std::string& name) {
@@ -1224,9 +1231,8 @@ BPFTraceMap BPFtrace::get_map(const std::string& name) {
     IMap& map = *mapmap.value();
     return get_map(map);
   }
-
+  return {};
 }
-
 
 BPFTraceMap BPFtrace::get_map(IMap &map) {
   BPFTraceMap values_by_key;
