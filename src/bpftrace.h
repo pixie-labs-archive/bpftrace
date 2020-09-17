@@ -137,7 +137,7 @@ public:
   void request_finalize();
   bool is_aslr_enabled(int pid);
 
-  BpfOrc* bpforc_;
+  BpfOrc* bpforc_ = nullptr;
   int epollfd_ = -1;
   std::function<void(const std::vector<Field>&, uint8_t*)> printf_callback_;
 

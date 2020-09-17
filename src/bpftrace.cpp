@@ -1153,10 +1153,12 @@ int BPFtrace::finalize() {
   finalize_ = false;
   exitsig_recv = false;
 
-  if (run_special_probe("END_trigger", *bpforc_, END_trigger))
+  if (bpforc_ != nullptr && run_special_probe("END_trigger", *bpforc_, END_trigger))
     return -1;
 
-  poll_perf_events(epollfd_, true);
+  if (epollfd_ != -1) {
+    poll_perf_events(epollfd_, true);
+  }
 
   return 0;
 }
