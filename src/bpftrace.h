@@ -139,7 +139,7 @@ public:
 
   BpfOrc* bpforc_ = nullptr;
   int epollfd_ = -1;
-  std::function<void(const std::vector<Field>&, uint8_t*)> printf_callback_;
+  std::function<void(uint8_t*)> printf_callback_;
 
   std::string cmd_;
   bool finalize_ = false;

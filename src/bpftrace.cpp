@@ -705,7 +705,7 @@ void perf_event_printer(void *cb_cookie, void *data, int size)
   auto arg_values = bpftrace->get_arg_values(args, arg_data);
 
   if (bpftrace->printf_callback_) {
-    bpftrace->printf_callback_(args, arg_data);
+    bpftrace->printf_callback_(arg_data);
     return;
   }
 
