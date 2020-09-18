@@ -1046,7 +1046,7 @@ int BPFtrace::run() {
   // Polls until interrupted with a signal.
   bool stop = false;
   while (!stop) {
-    stop = poll_perf_events(epollfd_);
+    stop = poll_perf_events();
   }
 
   // Run the END block and wrap-up.
@@ -1156,9 +1156,7 @@ int BPFtrace::finalize() {
   if (bpforc_ != nullptr && run_special_probe("END_trigger", *bpforc_, END_trigger))
     return -1;
 
-  if (epollfd_ != -1) {
-    poll_perf_events(epollfd_, true);
-  }
+  poll_perf_events(true);
 
   return 0;
 }
@@ -1204,6 +1202,10 @@ int BPFtrace::setup_perf_events()
 // Non-zero value indicates that caller should finalize.
 int BPFtrace::poll_perf_events(bool drain, int timeout)
 {
+  if (epollfd_ == -1) {
+    return 1;
+  }
+
   auto events = std::vector<struct epoll_event>(online_cpus_);
 
   int ready = epoll_wait(epollfd_, events.data(), online_cpus_, timeout);
