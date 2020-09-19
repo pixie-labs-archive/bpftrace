@@ -582,16 +582,19 @@ bool ClangParser::parse(ast::Program *program, BPFtrace &bpftrace, std::vector<s
       .Length = input.size(),
   });
 
-  std::vector<const char *> args =
-  {
-    "-isystem", "/usr/local/include",
-    "-isystem", "/bpftrace/include",
-    "-isystem", "/usr/include",
-  };
+  std::vector<const char *> args;
   for (auto &flag : extra_flags)
   {
     args.push_back(flag.c_str());
   }
+
+  std::vector<const char *> well_known_includes = {
+    "-isystem", "/usr/local/include",
+    "-isystem", "/bpftrace/include",
+    "-isystem", "/usr/include",
+  };
+
+  args.insert(args.end(), well_known_includes.begin(), well_known_includes.end());
 
   bool process_btf = program->c_definitions.empty() ||
                      (bpftrace.force_btf_ && bpftrace.btf_.has_data());
