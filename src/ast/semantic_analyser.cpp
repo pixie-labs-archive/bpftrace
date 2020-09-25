@@ -79,6 +79,13 @@ void SemanticAnalyser::visit(PositionalParameter &param)
 
 void SemanticAnalyser::visit(String &string)
 {
+  // Skip check for printf()'s first argument and create the full string.
+  if (func_ == "printf" && func_arg_idx_ == 0)
+  {
+    string.type = CreateString(string.str.size());
+    return;
+  }
+
   if (!is_compile_time_func(func_) && string.str.size() > STRING_SIZE - 1)
   {
     LOG(ERROR, string.loc, err_) << "String is too long (over " << STRING_SIZE
@@ -391,6 +398,7 @@ void SemanticAnalyser::visit(Call &call)
     ~func_setter()
     {
       analyser_.func_ = old_func_;
+      analyser_.func_arg_idx_ = -1;
     }
 
   private:
@@ -401,8 +409,10 @@ void SemanticAnalyser::visit(Call &call)
   func_setter scope_bound_func_setter{ *this, call.func };
 
   if (call.vargs) {
-    for (auto &expr : *call.vargs)
+    for (size_t i = 0; i < call.vargs->size(); ++i)
     {
+      auto &expr = (*call.vargs)[i];
+      func_arg_idx_ = i;
       expr->accept(*this);
     }
   }
