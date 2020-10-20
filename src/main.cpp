@@ -799,7 +799,7 @@ int main(int argc, char *argv[])
   else
     bpftrace.out_->attached_probes(num_probes);
 
-  bpftrace.bpforc_ = std::move(bpforc);
+  bpftrace.bpforc_ = bpforc.get();
   err = bpftrace.run();
   if (err)
     return err;
