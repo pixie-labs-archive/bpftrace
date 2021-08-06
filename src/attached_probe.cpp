@@ -698,7 +698,8 @@ void AttachedProbe::attach_uprobe(bool safe_mode)
                                         eventname().c_str(),
                                         probe_.path.c_str(),
                                         offset_,
-                                        probe_.pid);
+                                        probe_.pid,
+                                        0);
 
   if (perf_event_fd < 0)
     throw std::runtime_error("Error attaching probe: " + probe_.name);
@@ -808,7 +809,7 @@ void AttachedProbe::attach_usdt(int pid)
   offset_ = resolve_offset(probe_.path, probe_.attach_point, probe_.loc);
 
   int perf_event_fd = bpf_attach_uprobe(progfd_, attachtype(probe_.type),
-      eventname().c_str(), probe_.path.c_str(), offset_, pid == 0 ? -1 : pid);
+                                        eventname().c_str(), probe_.path.c_str(), offset_, pid == 0 ? -1 : pid, 0);
 
   if (perf_event_fd < 0)
   {
